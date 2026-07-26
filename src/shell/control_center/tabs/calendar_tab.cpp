@@ -146,7 +146,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
 
   if (m_calendar != nullptr && !m_changeCallbackRegistered) {
     m_changeCallbackRegistered = true;
-    m_calendar->addChangeCallback([this]() {
+    (void)m_calendar->addChangeCallback([this]() {
       m_eventsDirty = true;
       PanelManager::instance().refresh();
     });
