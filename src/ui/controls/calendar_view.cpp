@@ -469,10 +469,9 @@ namespace calendar_view {
           area->setTooltip(event.url);
 
           Flex* row = eventRow;
-          const float radius = Style::radiusSm * options.scale;
-          const auto setHovered = [row, radius, requestRedraw = options.requestRedraw](bool hovered) {
+          row->setRadius(Style::radiusSm * options.scale);
+          const auto setHovered = [row, requestRedraw = options.requestRedraw](bool hovered) {
             if (hovered) {
-              row->setRadius(radius);
               row->setFill(colorSpecFromRole(ColorRole::Hover));
             } else {
               row->clearFill();
@@ -511,7 +510,7 @@ namespace calendar_view {
         continue;
       }
       area->setPosition(0.0F, 0.0F);
-      area->setSize(row->width(), row->height());
+      area->setFrameSize(row->width(), row->height());
     }
   }
 
