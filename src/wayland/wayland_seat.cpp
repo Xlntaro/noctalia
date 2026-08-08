@@ -38,7 +38,7 @@ namespace {
       .axis = &WaylandSeat::handlePointerAxis,
       .frame = &WaylandSeat::handlePointerFrame,
       .axis_source = &WaylandSeat::handlePointerAxisSource,
-      .axis_stop = [](void*, wl_pointer*, std::uint32_t, std::uint32_t) {},
+      .axis_stop = &WaylandSeat::handlePointerAxisStop,
       .axis_discrete = &WaylandSeat::handlePointerAxisDiscrete,
       .axis_value120 = &WaylandSeat::handlePointerAxisValue120,
       .axis_relative_direction = [](void*, wl_pointer*, std::uint32_t, std::uint32_t) {},
@@ -55,9 +55,9 @@ namespace {
   };
 
   constexpr Logger kLog("seat");
-  constexpr float kAxisValue120PerStep = 120.0f;
+  constexpr float kAxisValue120PerStep = 120.0F;
   // libinput reports one wheel detent as 15 degrees of rotation.
-  constexpr float kLegacyWheelAxisUnitsPerStep = 15.0f;
+  constexpr float kLegacyWheelAxisUnitsPerStep = 15.0F;
 
 } // namespace
 
@@ -331,6 +331,7 @@ void WaylandSeat::handlePointerAxis(
       .axis = axis,
       .axisSource = self->m_pendingAxisSource,
       .axisValue = wl_fixed_to_double(value),
+      .axisGestureSerial = axis < self->m_axisGestureSerial.size() ? self->m_axisGestureSerial[axis] : 0,
   };
 
   // axis_discrete/axis_value120 arrive before the axis event they describe, and
@@ -354,6 +355,15 @@ void WaylandSeat::handlePointerAxisSource(void* data, wl_pointer* /*pointer*/, s
   self->m_pendingAxisSource = axisSource;
 }
 
+void WaylandSeat::handlePointerAxisStop(
+    void* data, wl_pointer* /*pointer*/, std::uint32_t /*time*/, std::uint32_t axis
+) {
+  auto* self = static_cast<WaylandSeat*>(data);
+  if (axis < self->m_axisGestureSerial.size()) {
+    ++self->m_axisGestureSerial[axis];
+  }
+}
+
 void WaylandSeat::handlePointerAxisDiscrete(
     void* data, wl_pointer* /*pointer*/, std::uint32_t axis, std::int32_t discrete
 ) {
@@ -364,7 +374,7 @@ void WaylandSeat::handlePointerAxisDiscrete(
   AxisDetent& detent = self->m_pendingAxisDetents[axis];
   detent.valid = true;
   detent.discrete = discrete;
-  if (detent.lines == 0.0f) {
+  if (detent.lines == 0.0F) {
     detent.lines = static_cast<float>(discrete);
   }
 }
@@ -396,7 +406,7 @@ void WaylandSeat::handlePointerFrame(void* data, wl_pointer* /*pointer*/) {
 
   for (auto& event : events) {
     if (event.type == PointerEvent::Type::Axis
-        && event.axisLines == 0.0f
+        && event.axisLines == 0.0F
         && (event.axisSource == WL_POINTER_AXIS_SOURCE_WHEEL || event.axisSource == WL_POINTER_AXIS_SOURCE_WHEEL_TILT)
         && event.axisValue != 0.0) {
       // Some compositors send wheel-source axis events without discrete/value120.

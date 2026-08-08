@@ -1,6 +1,7 @@
 #pragma once
 
 #include "shell/desktop/desktop_widget.h"
+#include "ui/controls/calendar_view.h"
 
 #include <cstdint>
 #include <limits>
@@ -59,6 +60,7 @@ private:
   Flex* m_eventsColumn = nullptr;
   Label* m_eventsTitle = nullptr;
   ScrollView* m_eventsScroll = nullptr;
+  calendar_view::EventListState m_eventListState;
 
   int m_selectedYear = std::numeric_limits<int>::min();
   int m_selectedMonth = -1;

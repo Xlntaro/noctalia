@@ -163,6 +163,28 @@ location = "https://example.invalid/bad"
         fail("plugins: derived subdir for invalid plugin id " + id);
       }
     }
+
+    // Canonical entry ids gate host construction and state-store scoping, so the
+    // shapes that must not slip through are the near-misses: no colon, extra colons,
+    // and an empty or malformed entry segment.
+    const std::string validEntries[] = {
+        "noctalia/screen_recorder:widget", "me/hello:a", "Team/repo_2:entry-1", "a/b.c-d:e.f"
+    };
+    for (const auto& id : validEntries) {
+      if (!scripting::isValidPluginEntryId(id)) {
+        fail("plugins: rejected valid entry id " + id);
+      }
+    }
+
+    const std::string invalidEntries[] = {
+        "",          "me/hello",   "me/hello:",   ":widget",          "me/hello:a:b",
+        "mehello:a", "me/hello:.", "me/hello:..", "me/hello:wid get", "me/foo/bar:a",
+    };
+    for (const auto& id : invalidEntries) {
+      if (scripting::isValidPluginEntryId(id)) {
+        fail("plugins: accepted invalid entry id " + id);
+      }
+    }
   }
 
   // A fully-specified bar with a fully-specified monitor override. Every override
@@ -234,6 +256,9 @@ location = "https://example.invalid/bad"
     group.padding = 20.0f;
     group.radius = 14.0f;
     group.opacity = 0.8f;
+    group.accordion = true;
+    group.accordionDirection = BarAccordionDirection::Start;
+    group.widgetSpacing = 10;
     bar.widgetCapsuleGroups = {group};
 
     BarMonitorOverride ovr;
@@ -317,8 +342,13 @@ location = "https://example.invalid/bad"
     c.osd.kinds.lockKeys = false;
     c.osd.kinds.keyboardLayout = false;
     c.backdrop = BackdropConfig{true, 0.8f, 0.2f};
-    c.lockscreen =
-        LockscreenConfig{.blurredDesktop = true, .blurIntensity = 0.6f, .tintIntensity = 0.25f, .monitors = {"DP-1"}};
+    c.lockscreen = LockscreenConfig{
+        .lockBeforeSuspend = false,
+        .blurredDesktop = true,
+        .blurIntensity = 0.6f,
+        .tintIntensity = 0.25f,
+        .monitors = {"DP-1"}
+    };
     c.system.monitor.enabled = false;
     c.system.monitor.cpuTempSensorPath = "/sys/class/hwmon/hwmon3/temp1_input";
     c.system.monitor.cpuPollSeconds = 5.0f;
@@ -347,6 +377,7 @@ location = "https://example.invalid/bad"
         .offsetY = 6,
         .monitors = {"DP-2"},
         .collapseOnDismiss = false,
+        .historyRetentionHours = 48,
         .filters = {NotificationFilterConfig{
             .name = "discord",
             .enabled = true,
@@ -410,6 +441,9 @@ location = "https://example.invalid/bad"
     c.keybinds.down = {*parseKeyChordSpec("Down")};
     c.keybinds.tabNext = defaultKeybindSet(KeybindAction::TabNext);
     c.keybinds.tabPrevious = defaultKeybindSet(KeybindAction::TabPrevious);
+    c.keybinds.deleteEntry = defaultKeybindSet(KeybindAction::Delete);
+    c.keybinds.copy = defaultKeybindSet(KeybindAction::Copy);
+    c.keybinds.save = defaultKeybindSet(KeybindAction::Save);
     c.hooks.commands[0] = {"notify-send hi"};
     c.hooks.commands[2] = {"cmd-a", "cmd-b"};
     c.idle.preActionFadeSeconds = 3.0f;
@@ -441,9 +475,11 @@ location = "https://example.invalid/bad"
     c.storage.keySource = StorageKeySource::File;
     c.storage.keyFile = "/run/agenix/noctalia-storage-key";
     c.shell.avatarPath = "/home/u/face.png";
+    c.shell.settingsWindowTranslucent = true;
     c.shell.animation.speed = 1.5f;
     c.shell.shadow.direction = ShadowDirection::UpLeft;
     c.shell.panel.transparencyMode = PanelTransparencyMode::Glass;
+    c.shell.panel.floatingLayer = "top";
     c.shell.panel.launcherPlacement = PanelPlacement::Floating;
     c.shell.launcher.compact = true;
     c.shell.launcher.sortByUsage = false;
@@ -459,6 +495,7 @@ location = "https://example.invalid/bad"
     c.shell.launcher.providers = {
         LauncherProviderConfig{"session", "s", true}, LauncherProviderConfig{"wallpaper", "w"}
     };
+    c.shell.keyboardLayout.customLabels = {{"English (US)", "US"}, {"German", "DE"}};
     c.shell.screenCorners.enabled = true;
     c.shell.screenCorners.size = 24;
     c.shell.mpris.blacklist = {"firefox"};
@@ -626,6 +663,36 @@ credential_source = "automatic"
 )");
     if (!unknownSource.hasErrors()) {
       fail("calendar: unknown credential source was not an error");
+    }
+  }
+
+  void checkPanelFloatingLayerValidation() {
+    const auto parse = [](std::string_view panelConfig, ShellConfig& shell) {
+      const toml::table table = toml::parse(panelConfig);
+      Diagnostics diagnostics;
+      readInto(table, shell, shellSchema(), "shell", diagnostics);
+      return diagnostics;
+    };
+
+    ShellConfig validShell;
+    const Diagnostics valid = parse("[panel]\nfloating_layer = \"top\"", validShell);
+    if (valid.hasErrors() || validShell.panel.floatingLayer != "top") {
+      fail("shell.panel.floating_layer: valid top layer was rejected");
+    }
+
+    ShellConfig invalidShell;
+    const Diagnostics invalid = parse("[panel]\nfloating_layer = \"bottom\"", invalidShell);
+    if (invalidShell.panel.floatingLayer != "overlay") {
+      fail("shell.panel.floating_layer: invalid value replaced the overlay default");
+    }
+    bool sawWarning = false;
+    for (const auto& entry : invalid.entries) {
+      if (entry.severity == Diagnostics::Severity::Warning && entry.path == "shell.panel.floating_layer") {
+        sawWarning = true;
+      }
+    }
+    if (!sawWarning) {
+      fail("shell.panel.floating_layer: invalid value did not produce a warning");
     }
   }
 
@@ -873,6 +940,8 @@ widget_spacing = 8
         right = "exec notify-send bar-right"
 
         [[default.monitor.DP-1.capsule_group]]
+        accordion = false
+        accordion_direction = "end"
         border = "#0F0E0D"
         enabled = true
         fill = "#F1F2F3"
@@ -884,6 +953,8 @@ widget_spacing = 8
         radius = 9.0
 
     [[default.capsule_group]]
+    accordion = true
+    accordion_direction = "start"
     border = "#333435"
     enabled = true
     fill = "#222324"
@@ -892,7 +963,8 @@ widget_spacing = 8
     members = [ "clock", "weather" ]
     opacity = 0.80000001192092896
     padding = 20.0
-    radius = 14.0)";
+    radius = 14.0
+    widget_spacing = 10)";
 
   const Config probe = makeProbe();
   const toml::table serialized = config_export::serialize(probe);
@@ -993,6 +1065,7 @@ widget_spacing = 8
   checkPluginSourceNameValidation();
   checkCalendarCredentialSourceValidation();
   checkStorageKeySourceValidation();
+  checkPanelFloatingLayerValidation();
   checkClamps();
   checkCustomColorFallback();
   checkTemplateConfigCustomColorsExport();

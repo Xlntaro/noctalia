@@ -18,11 +18,11 @@
 
 namespace {
 
-  constexpr float kGraphicBodyWidth = 22.0f;
-  constexpr float kGraphicBodyHeight = 14.0f;
-  constexpr float kGraphicTerminalWidth = 2.5f;
-  constexpr float kGraphicTerminalHeight = 7.0f;
-  constexpr float kGraphicCornerRadius = 3.0f;
+  constexpr float kGraphicBodyWidth = 22.0F;
+  constexpr float kGraphicBodyHeight = 14.0F;
+  constexpr float kGraphicTerminalWidth = 2.5F;
+  constexpr float kGraphicTerminalHeight = 7.0F;
+  constexpr float kGraphicCornerRadius = 3.0F;
 
   ColorSpec withOpacity(ColorSpec color, float opacity) {
     color.alpha *= opacity;
@@ -83,7 +83,7 @@ std::string BatteryWidget::buildLabelText(int pct, const UPowerState& state) con
     break;
   case BatteryLabelContent::Rate:
     if (state.energyRate > 0.0) {
-      return std::format("{:.1f} W", state.energyRate);
+      return std::format("{:.1F} W", state.energyRate);
     }
     break;
   case BatteryLabelContent::Percent:
@@ -93,7 +93,7 @@ std::string BatteryWidget::buildLabelText(int pct, const UPowerState& state) con
 }
 
 void BatteryWidget::create() {
-  auto container = std::make_unique<InputArea>();
+  auto container = ui::inputArea({});
   setRoot(std::move(container));
 
   if (m_displayMode == BatteryDisplayMode::Graphic) {
@@ -111,7 +111,7 @@ void BatteryWidget::createGraphicMode() {
   container->addChild(
       ui::box({
           .out = &m_bodyBg,
-          .fill = withOpacity(widgetForegroundOr(colorSpecFromRole(ColorRole::OnSurface)), 0.25f),
+          .fill = withOpacity(widgetForegroundOr(colorSpecFromRole(ColorRole::OnSurface)), 0.3F),
       })
   );
 
@@ -124,7 +124,7 @@ void BatteryWidget::createGraphicMode() {
   container->addChild(
       ui::box({
           .out = &m_terminalNub,
-          .fill = withOpacity(widgetForegroundOr(colorSpecFromRole(ColorRole::OnSurface)), 0.25f),
+          .fill = withOpacity(widgetForegroundOr(colorSpecFromRole(ColorRole::OnSurface)), 0.3F),
       })
   );
 
@@ -208,18 +208,18 @@ void BatteryWidget::layoutGraphicMode(Renderer& renderer) {
     return;
   }
 
-  const float scale = (Style::fontSizeBody / 14.0f) * m_contentScale;
+  const float scale = (Style::fontSizeBody / 14.0F) * m_contentScale;
   const float bodyW = std::round(kGraphicBodyWidth * scale);
   const float bodyH = std::round(kGraphicBodyHeight * scale);
   const float termW = std::round(kGraphicTerminalWidth * scale);
   const float termH = std::round(kGraphicTerminalHeight * scale);
   const float cornerR = std::round(kGraphicCornerRadius * scale);
-  const float labelGap = Style::spaceXs * m_contentScale;
-  const float stateGap = std::round(Style::spaceXs * 0.5f * m_contentScale);
+  const float labelGap = std::round(Style::spaceXs * m_contentScale);
+  const float stateGap = std::round(Style::spaceXs * 0.5F * m_contentScale);
   const bool showLabel = m_overlayLabel != nullptr && m_showLabel;
   const bool showStateGlyph = m_overlayGlyph != nullptr && m_overlayGlyph->visible();
-  const bool showStateGlyphOutside = showStateGlyph && showLabel;
-  const bool showStateGlyphInside = showStateGlyph && !showLabel;
+  const bool hasOverlay = showLabel || showStateGlyph;
+
   if (showLabel) {
     m_overlayLabel->setFontSize((m_isVertical ? Style::fontSizeCaption : Style::fontSizeBody) * m_contentScale);
     m_overlayLabel->measure(renderer);
@@ -232,77 +232,67 @@ void BatteryWidget::layoutGraphicMode(Renderer& renderer) {
   if (m_isVertical) {
     const float graphicW = bodyH;
     const float graphicH = bodyW + termW;
-    const float labelW = showLabel ? m_overlayLabel->width() : 0.0f;
-    const float labelH = showLabel ? m_overlayLabel->height() : 0.0f;
-    const float stateW = showStateGlyphOutside ? m_overlayGlyph->width() : 0.0f;
-    const float stateH = showStateGlyphOutside ? m_overlayGlyph->height() : 0.0f;
-    const float labelGroupH = labelH + (showStateGlyphOutside ? stateGap + stateH : 0.0f);
+    const float labelW = showLabel ? m_overlayLabel->width() : 0.0F;
+    const float labelH = showLabel ? labelGap + m_overlayLabel->height() : 0.0F;
+    const float stateW = showStateGlyph ? m_overlayGlyph->width() : 0.0F;
+    const float stateH = showStateGlyph ? stateGap + m_overlayGlyph->height() : 0.0F;
+    const float overlayGroupH = stateH + labelH;
     const float rootW = std::max({graphicW, labelW, stateW});
-    const float bodyX = std::round((rootW - graphicW) * 0.5f);
+    const float bodyX = std::round((rootW - graphicW) * 0.5F);
     const float bodyY = termW;
 
     m_bodyBg->setRadius(cornerR);
     m_bodyBg->setPosition(bodyX, bodyY);
     m_bodyBg->setSize(bodyH, bodyW);
 
-    m_terminalNub->setRadius(cornerR * 0.5f);
-    m_terminalNub->setPosition(bodyX + std::round((bodyH - termH) * 0.5f), 0.0f);
+    m_terminalNub->setRadius(cornerR * 0.5F);
+    m_terminalNub->setPosition(bodyX + std::round((bodyH - termH) * 0.5F), 0.0F);
     m_terminalNub->setSize(termH, termW);
 
     m_fillRect->setRadius(cornerR);
     updateFillGeometry();
 
+    if (showStateGlyph) {
+      m_overlayGlyph->setPosition(std::round((rootW - stateW) * 0.5F), graphicH + stateGap);
+    }
     if (showLabel) {
-      m_overlayLabel->setPosition(std::round((rootW - labelW) * 0.5f), graphicH + labelGap);
+      const float labelY = graphicH + labelGap + (showStateGlyph ? stateH : 0.0F);
+      m_overlayLabel->setPosition(std::round((rootW - labelW) * 0.5F), labelY);
     }
 
-    if (showStateGlyphOutside) {
-      m_overlayGlyph->setPosition(std::round((rootW - stateW) * 0.5f), graphicH + labelGap + labelH + stateGap);
-    } else if (showStateGlyphInside) {
-      m_overlayGlyph->setPosition(
-          bodyX + std::round((bodyH - m_overlayGlyph->width()) * 0.5f),
-          bodyY + std::round((bodyW - m_overlayGlyph->height()) * 0.5f)
-      );
-    }
-
-    rootNode->setSize(rootW, graphicH + (showLabel ? labelGap + labelGroupH : 0.0f));
+    rootNode->setSize(rootW, graphicH + (hasOverlay ? overlayGroupH : 0.0F));
   } else {
     const float graphicW = bodyW + termW;
     const float graphicH = bodyH;
-    const float labelW = showLabel ? m_overlayLabel->width() : 0.0f;
-    const float labelH = showLabel ? m_overlayLabel->height() : 0.0f;
-    const float stateW = showStateGlyphOutside ? m_overlayGlyph->width() : 0.0f;
-    const float stateH = showStateGlyphOutside ? m_overlayGlyph->height() : 0.0f;
-    const float labelGroupW = labelW + (showStateGlyphOutside ? stateGap + stateW : 0.0f);
-    const float labelGroupH = std::max(labelH, stateH);
-    const float rootH = std::max(graphicH, labelGroupH);
-    const float bodyY = std::round((rootH - bodyH) * 0.5f);
+    const float labelW = showLabel ? labelGap + m_overlayLabel->width() : 0.0F;
+    const float labelH = showLabel ? m_overlayLabel->height() : 0.0F;
+    const float stateW = showStateGlyph ? stateGap + m_overlayGlyph->width() : 0.0F;
+    const float stateH = showStateGlyph ? m_overlayGlyph->height() : 0.0F;
+    const float overlayGroupW = stateW + labelW;
+    const float overlayGroupH = std::max(labelH, stateH);
+    const float rootH = std::max(graphicH, overlayGroupH);
+    const float bodyY = std::round((rootH - bodyH) * 0.5F);
 
     m_bodyBg->setRadius(cornerR);
-    m_bodyBg->setPosition(0.0f, bodyY);
+    m_bodyBg->setPosition(0.0F, bodyY);
     m_bodyBg->setSize(bodyW, bodyH);
 
-    m_terminalNub->setRadius(cornerR * 0.5f);
-    m_terminalNub->setPosition(bodyW, bodyY + std::round((bodyH - termH) * 0.5f));
+    m_terminalNub->setRadius(cornerR * 0.5F);
+    m_terminalNub->setPosition(bodyW, bodyY + std::round((bodyH - termH) * 0.5F));
     m_terminalNub->setSize(termW, termH);
 
     m_fillRect->setRadius(cornerR);
     updateFillGeometry();
 
+    if (showStateGlyph) {
+      m_overlayGlyph->setPosition(graphicW + stateGap, std::round((rootH - stateH) * 0.5F));
+    }
     if (showLabel) {
-      m_overlayLabel->setPosition(graphicW + labelGap, std::round((rootH - labelH) * 0.5f));
+      const float labelX = graphicW + labelGap + (showStateGlyph ? stateW : 0.0F);
+      m_overlayLabel->setPosition(labelX, std::round((rootH - labelH) * 0.5F));
     }
 
-    if (showStateGlyphOutside) {
-      m_overlayGlyph->setPosition(graphicW + labelGap + labelW + stateGap, std::round((rootH - stateH) * 0.5f));
-    } else if (showStateGlyphInside) {
-      m_overlayGlyph->setPosition(
-          std::round((bodyW - m_overlayGlyph->width()) * 0.5f),
-          bodyY + std::round((bodyH - m_overlayGlyph->height()) * 0.5f)
-      );
-    }
-
-    rootNode->setSize(graphicW + (showLabel ? labelGap + labelGroupW : 0.0f), rootH);
+    rootNode->setSize(graphicW + (hasOverlay ? overlayGroupW : 0.0F), rootH);
   }
 }
 
@@ -319,13 +309,13 @@ void BatteryWidget::layoutGlyphMode(Renderer& renderer, float /*containerWidth*/
 
     if (m_isVertical) {
       const float w = std::max(m_glyph->width(), m_label->width());
-      m_glyph->setPosition(std::round((w - m_glyph->width()) * 0.5f), 0.0f);
-      m_label->setPosition(std::round((w - m_label->width()) * 0.5f), m_glyph->height());
+      m_glyph->setPosition(std::round((w - m_glyph->width()) * 0.5F), 0.0F);
+      m_label->setPosition(std::round((w - m_label->width()) * 0.5F), m_glyph->height());
       rootNode->setSize(w, m_glyph->height() + m_label->height());
     } else {
       const float h = std::max(m_glyph->height(), m_label->height());
-      m_glyph->setPosition(0.0f, std::round((h - m_glyph->height()) * 0.5f));
-      m_label->setPosition(m_glyph->width() + Style::spaceXs, std::round((h - m_label->height()) * 0.5f));
+      m_glyph->setPosition(0.0F, std::round((h - m_glyph->height()) * 0.5F));
+      m_label->setPosition(m_glyph->width() + Style::spaceXs, std::round((h - m_label->height()) * 0.5F));
       rootNode->setSize(m_label->x() + m_label->width(), h);
     }
   } else {
@@ -349,7 +339,7 @@ void BatteryWidget::updateFillGeometry() {
     return;
   }
 
-  const float fraction = std::clamp(m_animatedPct / 100.0f, 0.0f, 1.0f);
+  const float fraction = std::clamp(m_animatedPct / 100.0F, 0.0F, 1.0F);
 
   if (m_isVertical) {
     const float bodyW = m_bodyBg->width();
@@ -433,16 +423,16 @@ void BatteryWidget::syncState(Renderer& renderer) {
       m_fillRect->setFill(fgColor);
     }
     if (m_bodyBg != nullptr) {
-      m_bodyBg->setFill(withOpacity(fgColor, 0.25f));
+      m_bodyBg->setFill(withOpacity(fgColor, 0.3F));
     }
 
     if (m_terminalNub != nullptr) {
-      m_terminalNub->setFill(isWarning ? m_warningColor : withOpacity(normalFgColor, 0.25f));
+      m_terminalNub->setFill(withOpacity(fgColor, 0.3F));
     }
 
     // Animate fill percentage
     const auto newPct = static_cast<float>(s.percentage);
-    if (m_animations != nullptr && std::abs(m_animatedPct - newPct) > 0.5f) {
+    if (m_animations != nullptr && std::abs(m_animatedPct - newPct) > 0.5F) {
       m_animations->cancel(m_fillAnim);
       m_fillAnim = m_animations->animate(
           m_animatedPct, newPct, static_cast<float>(Style::animNormal), Easing::EaseOutCubic,

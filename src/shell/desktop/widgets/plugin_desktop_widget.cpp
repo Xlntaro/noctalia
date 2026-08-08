@@ -4,6 +4,7 @@
 #include "i18n/i18n.h"
 #include "notification/notifications.h"
 #include "scripting/plugin_runtime_context.h"
+#include "ui/builders.h"
 #include "ui/controls/flex.h"
 
 #include <cstdlib>
@@ -52,7 +53,7 @@ PluginDesktopWidget::~PluginDesktopWidget() {
 }
 
 void PluginDesktopWidget::create() {
-  auto flex = std::make_unique<Flex>();
+  auto flex = ui::column({});
   flex->setDirection(FlexDirection::Vertical);
   m_flex = flex.get();
   setRoot(std::move(flex));
@@ -85,6 +86,9 @@ void PluginDesktopWidget::create() {
     auto token = alive.lock();
     if (token == nullptr || !*token) {
       return;
+    }
+    if (result.modulePathsKnown) {
+      m_scriptWatcher.setModulePaths(result.modulePaths);
     }
     handleScriptResult(std::move(result));
   });
@@ -122,7 +126,7 @@ void PluginDesktopWidget::onFrameTick(float deltaMs, Renderer& renderer) {
   }
   // Coalesced like onAudioSpectrum: a slow script only ever sees the latest frame.
   (void)m_runtime->enqueueCallStrings(
-      "onFrameTick", std::format("{:.3f}", deltaMs), {}, makeScriptSnapshot(), /*coalesce=*/true
+      "onFrameTick", std::format("{:.3F}", deltaMs), {}, makeScriptSnapshot(), /*coalesce=*/true
   );
   requestRedraw(); // keep the frame loop alive while animating
 }
@@ -151,6 +155,7 @@ void PluginDesktopWidget::handleScriptResult(scripting::ScriptResult result) {
 
   if (result.unhealthy) {
     m_updateTimer.stop();
+    m_needsFrameTick = false;
     kLog.warn("plugin desktop widget '{}' disabled after repeated timeouts", m_entryId);
   }
 
@@ -211,19 +216,10 @@ void PluginDesktopWidget::startUpdateTimer() {
 }
 
 void PluginDesktopWidget::setupScriptWatch() {
-  if (m_sourcePath.empty() || m_fileWatcher == nullptr) {
-    return;
-  }
-  m_watchId = m_fileWatcher->watch(m_sourcePath, [this] { reloadScript(); }, FileWatcher::WatchTrigger::WriteCompleted);
+  m_scriptWatcher.start(m_fileWatcher, m_sourcePath, [this] { reloadScript(); });
 }
 
-void PluginDesktopWidget::teardownScriptWatch() {
-  if (m_watchId == 0 || m_fileWatcher == nullptr) {
-    return;
-  }
-  m_fileWatcher->unwatch(m_watchId);
-  m_watchId = 0;
-}
+void PluginDesktopWidget::teardownScriptWatch() { m_scriptWatcher.stop(); }
 
 void PluginDesktopWidget::reloadScript() {
   std::string source = readFile(m_sourcePath);

@@ -3,8 +3,10 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 class Flex;
+class InputArea;
 class Label;
 class ScrollView;
 struct CalendarSnapshot;
@@ -29,17 +31,17 @@ namespace calendar_view {
   };
 
   struct MonthLayout {
-    float width = 0.0f;
-    float weekdayHeight = 0.0f;
-    float dayCellHeight = 0.0f;
-    float dayButtonSize = 0.0f;
-    float gap = 0.0f;
-    float dotDiameter = 0.0f;
-    float dotGap = 0.0f;
-    float weekColumnWidth = 0.0f;
-    float weekLaneInset = 0.0f;
-    float weekDividerWidth = 0.0f;
-    float weekDaysGap = 0.0f;
+    float width = 0.0F;
+    float weekdayHeight = 0.0F;
+    float dayCellHeight = 0.0F;
+    float dayButtonSize = 0.0F;
+    float gap = 0.0F;
+    float dotDiameter = 0.0F;
+    float dotGap = 0.0F;
+    float weekColumnWidth = 0.0F;
+    float weekLaneInset = 0.0F;
+    float weekDividerWidth = 0.0F;
+    float weekDaysGap = 0.0F;
   };
 
   struct MonthBuildOptions {
@@ -49,10 +51,18 @@ namespace calendar_view {
     Date selected;
     int monthOffset = 0;
     bool showWeekNumbers = false;
-    float scale = 1.0f;
+    float scale = 1.0F;
     MonthLayout layout;
     std::string fontFamily;
     std::function<void(Date date, int monthShift)> onDateSelected;
+  };
+  struct EventLinkOverlay {
+    Flex* row = nullptr;
+    InputArea* area = nullptr;
+  };
+
+  struct EventListState {
+    std::vector<EventLinkOverlay> linkOverlays;
   };
 
   struct EventListBuildOptions {
@@ -61,15 +71,18 @@ namespace calendar_view {
     Label* title = nullptr;
     const CalendarSnapshot* snapshot = nullptr;
     Date selected;
-    float scale = 1.0f;
+    float scale = 1.0F;
     std::string_view dateFormat = "%A %e %B";
     std::string_view timeFormat = "%H:%M";
     std::string fontFamily;
+    EventListState* state = nullptr;
+    std::function<void()> requestRedraw;
   };
 
   [[nodiscard]] State stateForOffset(int monthOffset);
   [[nodiscard]] int dateKey(Date date) noexcept;
   void rebuildMonth(const MonthBuildOptions& options);
   void rebuildEventList(const EventListBuildOptions& options);
+  void layoutEventLinkOverlays(const EventListState& state);
 
 } // namespace calendar_view

@@ -29,7 +29,7 @@
   "bar": {
     "screenshot": {
       "choose-display": "Escolha o monitor",
-      "confirm-region": "Enter ou Espaço para capturar · Esc para cancelar · Arraste para reselecionar",
+      "confirm-region": "{copy} para copiar · {save} para salvar · Enter ou Espaço para padrões · {cancel} para cancelar · Arraste para reselecionar",
       "fullscreen": "Tela cheia",
       "overlay-alloc-failed": "Não foi possível mostrar a camada de captura de tela (GPU sem memória disponível?",
       "region": "Selecione a área"
@@ -59,6 +59,7 @@
       },
       "network": {
         "active": "Ativo",
+        "band": "Banda",
         "connected": "Conectado",
         "connecting": "Conectando",
         "download": "Download",
@@ -117,7 +118,18 @@
         "error": "Erro no clima",
         "loading": "Clima...",
         "no-location": "Sem localização",
-        "off": "Clima desligado"
+        "off": "Clima desligado",
+        "tooltip": {
+          "condition": "Condição",
+          "high": "Máxima",
+          "humidity": "Umidade",
+          "low": "Mínima",
+          "sunrise": "Nascer do Sol",
+          "sunset": "Pôr do Sol",
+          "temperature": "Temperatura",
+          "uv": "Índice UV",
+          "wind": "Vento"
+        }
       }
     }
   },
@@ -255,6 +267,7 @@
       "start-playback": "Iniciar reprodução em um aplicativo MPRIS"
     },
     "network": {
+      "available": "Disponível",
       "connect": "Conectar",
       "current-connection": "Conexão atual",
       "external-ip": "WAN {ip}",
@@ -263,6 +276,7 @@
       "password": "Senha",
       "password-prompt": "Digitar a senha",
       "password-prompt-for": "Digite a senha para {ssid}",
+      "saved": "Salvo",
       "unavailable-detail": "Instale e ative o NetworkManager, wpa_supplicant ou iwd para gerenciar redes a partir daqui.",
       "unavailable-title": "Serviço de rede indisponível",
       "vpns": "VPNs",
@@ -313,7 +327,7 @@
         "3-days": "3 dias",
         "today": "Hoje"
       },
-      "view-day": "Ver detalhes do dia"
+      "view-day": "Ver Detalhes do Dia"
     },
     "shortcuts": {
       "audio": "Áudio",
@@ -325,7 +339,7 @@
         "dark": "Modo Escuro",
         "light": "Modo Claro"
       },
-      "keyboard-layout": "Layout",
+      "keyboard-layout": "Layout de Teclado",
       "media": "Mídia",
       "mic-mute": "Microfone",
       "nightlight": "Luz Noturna",
@@ -516,9 +530,12 @@
         "show-keyboard-layout": "Layout do Teclado",
         "show-label": "Exibir Rótulo",
         "show-login-button": "Botão de Login",
+        "show-media": "Mídia",
         "show-password-hint": "Dica de Senha",
         "show-session-buttons": "Botões de Sessão",
+        "show-unlock-hint": "Dica de Desbloqueio",
         "show-vpn-label": "Mostra Rótulo VPN",
+        "show-weather": "Clima",
         "show-when-idle": "Mostrar Quando Ocioso",
         "stat": "Estatísticas",
         "stat-cpu-temp": "Temperatura da CPU",
@@ -669,7 +686,8 @@
     },
     "source": {
       "address": "Endereço",
-      "auto": "Automático"
+      "auto": "Automático",
+      "manual": "Manual"
     }
   },
   "lockscreen": {
@@ -678,7 +696,7 @@
     "caps-lock-on": "Caps Lock está ativo",
     "password-cleared": "Senha apagada",
     "password-placeholder": "Senha",
-    "ready": "Digite sua senha e aperte Enter.",
+    "ready": "Digite sua senha e pressione Enter.",
     "unlocked": "Desbloqueado",
     "waiting": "Aguardando confirmação de bloqueio…"
   },
@@ -713,7 +731,7 @@
       "config-migration-title": "Atualiação de configuração necessária",
       "dbus-disabled": "Notificações DBus desabilitadas",
       "desktop-widgets-editor": "Editor de Widget",
-      "desktop-widgets-editor-enabled": "O editor de widgets da área de trabalho está ativo. Alterne para uma área de trabalho vazia para visualizar a sobreposição do editor.",
+      "desktop-widgets-editor-enabled": "O editor de widgets da área de trabalho está ativo. Mude para um espaço de trabalho vazio para que as janelas abertas não cubram o editor.",
       "greeter-sync": "Noctalia Greeter",
       "greeter-sync-pending": "Aguardando aprovação do administrador para gravar no greeter.",
       "greeter-sync-pending-console": "Aguardando aprovação do administrador. Aprove o prompt do polkit no Noctalia, em um TTY ou console, ou execute o pkexec manualmente.",
@@ -730,7 +748,7 @@
       "launcher-usage-reset-success": "Dados de uso limpos.",
       "lockscreen-widgets-editor": "Editor de widgets da tela de bloqueio",
       "lockscreen-widgets-editor-blocked-locked": "Desbloqueie a sessão antes de editar os widgets da tela de bloqueio.",
-      "lockscreen-widgets-editor-enabled": "O editor de widgets da tela de bloqueio está ativo. Organize os widgets na sobreposição de visualização e, em seguida, bloqueie a sessão para verificar o layout.",
+      "lockscreen-widgets-editor-enabled": "O editor de widgets da tela de bloqueio está ativo. Mude para um espaço de trabalho vazio para que as janelas abertas não cubram o editor.",
       "mpris-disabled": "MPRIS desabilitado",
       "polkit-agent": "Agente de Autenticação",
       "polkit-no-session": "Agente Polkit precisa de logind, elogind or XDG_SESSION_ID. Em configurações que utilizam apenas o seatd, ele não consegue se registrar para solicitações gráficas. Use o pkexec no terminal para sincronizar o greeter ou instale o elogind para autenticação durante a sessão.",
@@ -852,7 +870,7 @@
       "inherited": "Herdado",
       "monitor": "Monitor",
       "official": "Oficial",
-      "override": "Sobrescrever"
+      "override": "Sobrescrito"
     },
     "calendar-accounts": {
       "add-title": "Adicionar Conta de Calendário",
@@ -950,10 +968,16 @@
           "title": "Widgets da Barra"
         },
         "group": {
+          "accordion": "Acordeão",
+          "accordion-description": "Mostra somente o primeiro widget; pairando sobre a capsula revela o resto",
+          "accordion-direction": "Direção de revelação",
+          "accordion-direction-description": "Lado do ",
           "action": "Grupo",
           "border": "Borda",
-          "border-description": "Função da cor do contorno da cápsula; deixe em Padrão para nenhum contorno.",
+          "border-description": "Cor do contorno da cápsula; deixe em Padrão para nenhum contorno.",
           "clear": "Apagar",
+          "deselect": "Desmarcar",
+          "drag": "Reordenar",
           "drawer-columns": "Número de ícones do tray por linha no painel do drawer.",
           "drawer-columns-description": "Número de widgets por linha no painel gaveta",
           "drawer-detached": "Painel Destacado",
@@ -980,17 +1004,25 @@
           "padding-description": "Espaçamento interno entre a borda da cápsula e seus widgets, em pixels.",
           "radius": "Raio",
           "radius-description": "Raio do canto da cápsula em pixels; Automaticamente herda o raio da cápsula da barra",
+          "remove-from-group": "Remover do grupo",
+          "remove-orphan": "Remover grupo desconhecido",
+          "remove-widget": "Remover da barra",
+          "select": "Selecionar para agrupar",
           "selected": "{count} selecionado",
+          "settings-widget": "Configurações do widget",
           "show": "Exibir este grupo",
           "show-widget": "Exibir este widget",
           "style": "Estilo",
           "title": "Grupo de cápsula",
-          "ungroup": "Desagrupar"
+          "ungroup": "Desagrupar",
+          "widget-spacing": "Espaçamento",
+          "widget-spacing-description": "Espaço entre widgets neste grupo em pixels; Herda automaticamente o espaçamento de widget da barra"
         },
         "inspector": {
           "add-instance-title": "Adicionar novo widget nomeado {widget} a {lane}",
-          "add-title": "Add widget a {lane}",
-          "move-to-lane": "Mover para {lane}"
+          "add-title": "Adiciona Widget a {lane}",
+          "move-to-lane": "Mover para {lane}",
+          "reset-defaults": "Redefinir para os Padrões"
         },
         "instance": {
           "create-save": "Criar",
@@ -1025,6 +1057,7 @@
           "empty": "Nenhuma configuração corresponde aos filtros atuais.",
           "groups": {
             "actions": "Ações",
+            "behavior": "Comportamento",
             "grouping": "Agrupamento",
             "presentation": "Apresentação",
             "runtime": "Tempo de Execução",
@@ -1085,7 +1118,7 @@
     },
     "idle": {
       "behavior": {
-        "add": "Adicionar comportamento",
+        "add": "Adicionar Comportamento",
         "command-label": "Comando ocioso",
         "command-placeholder": "notify-send \"Idle\"",
         "kind": {
@@ -1139,11 +1172,13 @@
         "general": "Geral",
         "greeter": "Greeter",
         "grouping": "Agrupamento",
+        "history": "Histórico",
         "home": "Início",
         "hot-corners": "Cantos Ativos",
         "idle": "Inatividade",
         "interface": "Interface",
         "keybinds": "Atalhos do Teclado",
+        "keyboard-layout": "Layout de Teclado",
         "kinds": "Tipos",
         "launcher": "Launcher",
         "layout": "Layout",
@@ -1175,7 +1210,7 @@
         "shape": "Forma",
         "system": "Sistema",
         "theme": "Tema",
-        "toasts": "Notificações Flutuantes",
+        "toasts": "Lâminas",
         "transition": "Transição",
         "user": "Usuário",
         "wallpaper": "Papel de Parede",
@@ -1212,7 +1247,7 @@
     },
     "notifications": {
       "filter": {
-        "add": "Adicionar filtro",
+        "add": "Adicionar Filtro",
         "add-title": "Adicionar Filtro de Notificação",
         "allow-permanent": "Autorização permanente",
         "allowed-urgencies-label": "Urgências permitidas",
@@ -1220,7 +1255,7 @@
           "history": "histórico",
           "permanent": "permanente",
           "sound": "som",
-          "toast": "notificação flutuante"
+          "toast": "lámina"
         },
         "flags-label": "Quando corresponder",
         "match-content-label": "Regex do Conteúdo",
@@ -1230,7 +1265,7 @@
         "override-duration": "Sobrescrever duração",
         "play-sound": "Tocar som",
         "save-history": "Salvar no histórico",
-        "show-toast": "Mostrar notificação flutuante",
+        "show-toast": "Mostrar lâmina",
         "summary": "{match} · {flags}",
         "summary-blocked": "{match} · bloqueados",
         "summary-disabled": "{match} · desativados",
@@ -1238,6 +1273,10 @@
       }
     },
     "options": {
+      "accordion-direction": {
+        "end": "Depois do primeiro widget",
+        "start": "Antes do primeiro widget"
+      },
       "bar": {
         "auto-hide": {
           "off": "Desligado",
@@ -1398,7 +1437,7 @@
       "browse-store": "Navegar Plugins",
       "panels": {
         "open-near-click": {
-          "description": "Abrir o painel próximo ao widget da barra que o abriu; abrir sem um gatilho na barra é centralizado",
+          "description": "Onde o painel é posicionado quando aberto ao clicar no widget da barra",
           "label": "Abrir Próximo ao Clique"
         },
         "placement": {
@@ -1433,8 +1472,8 @@
         "empty": "Nenhuma configuração disponível."
       },
       "sources": {
-        "add": "Adicionar fonte",
-        "add-title": "Adicionar fonte de plugin",
+        "add": "Adicionar Fonte",
+        "add-title": "Adicionar Fonte de Plugin",
         "auto-update": "Auto-atualizar plugins",
         "auto-update-desc": "Verificar em fontes ativas por novas versões em segundo plano e manter plugins instalados atualizados",
         "edit": "Editar fonte",
@@ -1476,7 +1515,13 @@
         "open-source": "Abrir repositório fonte de plugin",
         "results-count": "{count} plugins",
         "search-placeholder": "Pesquisar plugins...",
-        "source-all": "Todos",
+        "sort-added-at-asc": "Ordenar por data (mais antigos primeiro)",
+        "sort-added-at-desc": "Ordenar por data (mais recentes primeiro)",
+        "sort-name-asc": "Ordenar por nome (A-Z)",
+        "sort-name-desc": "Ordenar por nome (Z-A)",
+        "sort-updated-at-asc": "Ordenar por data de atualização (mais antigos primeiro)",
+        "sort-updated-at-desc": "Ordenar por data de atualização (mais recentes primeiro)",
+        "source-all": "Todas fontes",
         "title": "Loja de Plugins"
       }
     },
@@ -1509,8 +1554,12 @@
           "label": "Paleta Integrada"
         },
         "button-borders": {
-          "description": "Desenhe contornos ao redor dos botões em toda a interface",
+          "description": "Desenhar contornos ao redor dos botões em toda a interface",
           "label": "Bordas nos Botões"
+        },
+        "card-borders": {
+          "description": "Desenhar contornos ao redor dos cards de seção dentro dos painéis e da janela de configurações",
+          "label": "Bordas nos Cards"
         },
         "community-palette": {
           "description": "Escolha uma paleta de cores do catálogo da comunidade",
@@ -1542,7 +1591,7 @@
           "description": "Direção em que a sombra é projetada nas superfícies"
         },
         "input-borders": {
-          "description": "Desenhar linhas em torno de campos de texto e outros campos pelo shell",
+          "description": "Desenhar contornos ao redor de campos de texto e outros campos pelo shell",
           "label": "Bordas nos Campos"
         },
         "language": {
@@ -1554,7 +1603,7 @@
           "label": "Fonte da Paleta"
         },
         "popup-borders": {
-          "description": "Desenhar linhas em torno de pop-ups e menus suspensos",
+          "description": "Desenhar contornos ao redor de pop-ups e menus suspensos",
           "label": "Bordas nos Pop-ups"
         },
         "popup-shadows": {
@@ -1566,7 +1615,7 @@
           "label": "Preto Puro"
         },
         "theme-mode": {
-          "description": "Escolha o modo escuro, claro ou automático com base na hora do dia.",
+          "description": "Escolha o modo escuro, claro ou automático com base na hora do dia",
           "label": "Modo do Tema"
         },
         "ui-scale": {
@@ -1607,7 +1656,7 @@
           "label": "Largura da Borda"
         },
         "capsule-border": {
-          "description": "Função de cor de contorno padrão da cápsula; cores hexadecimais fixas também são suportadas",
+          "description": "Cor de contorno padrão da cápsula; cores hexadecimais fixas também são suportadas",
           "label": "Borda da Cápsula"
         },
         "capsule-fill": {
@@ -1669,7 +1718,7 @@
           "description": "Raio do canto superior direito da barra"
         },
         "dead-zone-action": {
-          "description": "Ação executada nas partes da barra que nenhum widget cobre; deixe vazio para o padrão"
+          "description": "Ação executada nas partes da barra que não são cobertas widgets"
         },
         "edge-margin": {
           "description": "Espaço entre a barra e a borda da tela em que ela está; defina como 0 px para alinhar exatamente com a borda"
@@ -2032,6 +2081,14 @@
           "description": "Feche janelas pop-up, descarte painéis ou interrompa a operação atual",
           "label": "Cancelar"
         },
+        "copy": {
+          "description": "Copiar a seleção ou item atual",
+          "label": "Copiar"
+        },
+        "delete": {
+          "description": "Excluir o item selecionado",
+          "label": "Excluir"
+        },
         "down": {
           "description": "Mova o foco ou a seleção uma linha para baixo",
           "label": "Navegar para Baixo"
@@ -2043,6 +2100,10 @@
         "right": {
           "description": "Mova o foco ou a seleção para a direita",
           "label": "Navegar para Direita"
+        },
+        "save": {
+          "description": "Salvar a seleção ou item atual",
+          "label": "Salvar"
         },
         "tab-next": {
           "description": "Mover o foco para o próximo controle",
@@ -2082,6 +2143,10 @@
           "description": "Desbloquear com um leitor de impressão digital por meio do fprintd, junto com uma da senha digitada",
           "label": "Desbloquear com Impressão Digital"
         },
+        "lock-before-suspend": {
+          "description": "Bloquear a sessão antes de dormir (fechando tampa, systemctl suspend, hibernate); Ações de bloquear & suspender ainda bloquearão primeiro.",
+          "label": "Bloquear Antes de Suspender"
+        },
         "monitors": {
           "description": "Escolha em quais monitores a tela de bloqueio será exibida; deixe em branco para exibir em todos os monitores",
           "label": "Monitores"
@@ -2118,11 +2183,11 @@
           "description": "Ainda exibe notificações críticas de remetentes na lista negra"
         },
         "border": {
-          "description": "Desenha um contorno ao redor das notificações",
+          "description": "Desenha um contorno ao redor das lâminas de notificação",
           "label": "Borda"
         },
         "collapse-on-dismiss": {
-          "description": "Deslizar as notificações flutuantes restantes para preencher as lacunas quando uma delas for descartada",
+          "description": "Deslizar as lâminas restantes para preencher as lacunas quando uma delas for descartada",
           "label": "Recolher ao Dispensar"
         },
         "daemon": {
@@ -2130,15 +2195,23 @@
           "label": "Daemon de Notificação"
         },
         "filters": {
-          "description": "Regras por emissor de notificações, histórico e sons; o primeiro filtro compatível ativado prevalece",
+          "description": "Regras por remetente para lâminas de notificação, histórico e sons; o primeiro filtro compatível ativado prevalece",
           "label": "Filtros de Notificações"
         },
+        "history-retention-hours": {
+          "description": "Automaticamente remover histórico de notificações se existir por mais que esta quantidade de horas (0 para manter para sempre)",
+          "label": "Período de Retenção"
+        },
         "layer": {
-          "description": "Use Overlay para mostrar notificações flutuantes acima de apps em tela cheia",
+          "description": "Use Overlay para mostrar lâminas de notificação acima de apps em tela cheia",
           "label": "Camada Wayland"
         },
+        "max-visible": {
+          "description": "Número máximo de lâminas de notificação visíveis na tela de uma só vez (0 para preencher todo espaço disponível)",
+          "label": "Máximo de Lâminas Visíveis"
+        },
         "monitors": {
-          "description": "Escolha em quais monitores as notificações serão exibidas; deixe em branco para exibir em todos os monitores",
+          "description": "Escolha quais monitores mostram lâminas de notificação; deixe em branco para exibir em todos os monitores",
           "label": "Monitores"
         },
         "offset-x": {
@@ -2150,29 +2223,29 @@
           "label": "Margem Vertical"
         },
         "position": {
-          "description": "Posição da tela para notificações flutuantes",
+          "description": "Posição da tela para lâminas de notificação",
           "label": "Posição na Tela"
         },
         "scale": {
-          "description": "Dimensionar as notificações flutuantes em relação à escala da interface do usuário do shell",
+          "description": "Dimensionar as lâminas de notificação em relação à escala da IU do shell",
           "label": "Escala"
         },
         "show-actions": {
-          "description": "Exibir botões de ação nas notificações; quando desativados, clicar na notificação aciona sua ação padrão",
+          "description": "Exibir botões de ação nas lâminas de notificação; quando desativados, clicar na lâmina aciona sua ação padrão",
           "label": "Exibir Botões de Ação"
         },
         "show-app-name": {
-          "description": "Exibir o nome do aplicativo remetente nas notificações flutuantes",
+          "description": "Exibir o nome do aplicativo remetente nas lâminas de notificação",
           "label": "Exibir Nome do App"
         },
         "toast-opacity": {
-          "description": "Opacidade do plano de fundo das notificações flutuantes",
+          "description": "Opacidade do plano de fundo das lâminas de notificação",
           "label": "Opacidade do Plano de Fundo"
         }
       },
       "panels": {
         "borders": {
-          "description": "Desenhe um contorno nos painéis e nos cartões de seção dentro dos painéis",
+          "description": "Desenhe um contorno nos painéis flutuantes",
           "label": "Bordas"
         },
         "control-center-sidebar": {
@@ -2191,6 +2264,10 @@
           "description": "Largura do painel da Central de Controle em pixels (os modos compacto e sem barra lateral são redimensionados a partir desse valor)",
           "label": "Largura da Central de Controle"
         },
+        "floating-layer": {
+          "description": "Use \"Topo\" se houver janelas atrás de painéis flutuantes; \"Overlay\" mantém painéis sobre conteúdo de tela cheia",
+          "label": "Camada do Painel Flutuante"
+        },
         "floating-offset": {
           "description": "Espaço, em pixels, entre um painel flutuante ou separado e a extremidade da barra",
           "label": "Deslocamento de Flutuação"
@@ -2198,6 +2275,10 @@
         "home-shortcuts": {
           "description": "Escolha até seis botões de atalho para a guia inicial",
           "label": "Atalhos do Início"
+        },
+        "home-shortcuts-show-labels": {
+          "description": "Mostrar rótulos de texto sob ícones de atalho na aba de início",
+          "label": "Mostra Rótulos de Atalhos"
         },
         "launcher-app-grid": {
           "description": "Exibe uma grade de ícones de aplicativos com legendas abaixo deles quando os resultados forem apenas aplicativos",
@@ -2285,27 +2366,27 @@
           "label": "Fundo dos Itens de Lista"
         },
         "open-near-click-clipboard": {
-          "description": "Posicionar o painel da área de transferência perto do widget da barra que o acionou; se aberto sem um gatilho, fica centralizado",
+          "description": "Onde a área de tranferência é posicionada quando aberto ao clicar no widget da barra",
           "label": "Ao Longo da Barra"
         },
         "open-near-click-control-center": {
-          "description": "Posicionar a Central de Controle perto do widget da barra que a acionou; se aberta sem um gatilho, fica centralizada",
+          "description": "Onde a Central de Controle é posicionada quando aberto ao clicar no widget da barra",
           "label": "Abrir Próximo ao Clique"
         },
         "open-near-click-launcher": {
-          "description": "Posicionar o launcher perto do widget da barra que o acionou; se aberto sem um gatilho, fica centralizado",
+          "description": "Onde o launcher é posicionado quando aberto ao clicar no widget da barra",
           "label": "Abrir Próximo ao Clique"
         },
         "open-near-click-session": {
-          "description": "Posicionar o painel de sessão perto do widget da barra que o acionou; se aberto sem um gatilho, fica centralizado",
+          "description": "Onde o painel da sessão é posicionado quando aberto ao clicar no widget da barra",
           "label": "Abrir Próximo ao Clique"
         },
         "open-near-click-wallpaper": {
-          "description": "Posicionar o seletor de papéis de parede perto do widget da barra que o acionou; se aberto sem um gatilho, fica centralizado",
+          "description": "Onde o seletor de papel de parede é posicionado quando aberto ao clicar no widget da barra",
           "label": "Abrir Próximo ao Clique"
         },
         "panel-anchor-bar": {
-          "description": "Barra à qual os painéis se anexam quando abertos. Deixe vazio para seguir o widget, atalho ou dock que os abriu",
+          "description": "Barra à qual os painéis se anexam quando abertos; Deixe vazio para seguir o widget, atalho ou dock que os abriu",
           "label": "Barra Âncora"
         },
         "placement-clipboard": {
@@ -2398,17 +2479,19 @@
         },
         "calendar-credentials": {
           "button": "Tentar Novamente",
-          "description-cancelled": "A solicitação do Secret Service foi cancelada. Tente novamente quando estiver pronto.",
-          "description-error": "Não foi possível acessar as credenciais do calendário por meio do Secret Service.",
-          "description-locked": "As credenciais do calendário estão bloqueadas ou o acesso foi negado. Desbloqueie o Secret Service e tente novamente.",
-          "description-migration": "As credenciais do calendário em texto simples estão aguardando para serem transferidas para o Secret Service. Elas não são usadas para a sincronização do calendário.",
-          "description-opening": "As credenciais para o calendário estão sendo abertas através do Secret Service.",
-          "description-unavailable": "Nenhum provedor de Secret Service disponível nesta sessão.",
+          "description-cancelled": "A solicitação do Secret Service foi cancelada; tente novamente quando estiver pronto",
+          "description-error": "Não foi possível acessar as credenciais do calendário por meio do Secret Service",
+          "description-locked": "Credenciais do calendário estão bloqueadas ou o acesso foi negado; desbloqueie o Secret Service e tente novamente",
+          "description-migration": "As credenciais do calendário em texto puro estão aguardando para serem movidas para o Secret Service; elas não são usadas para a sincronização",
+          "description-opening": "Credenciais para o calendário estão sendo abertas através do Secret Service",
+          "description-unavailable": "Nenhum provedor de Secret Service disponível nesta sessão",
           "label": "Armazenamento de Credenciais de Calendário"
         },
         "calendar-edit": {
           "button": "Editar",
-          "description": "Atualizar essa conta de Calendário"
+          "button-reconnect": "Reconectar",
+          "description": "Atualizar essa conta de Calendário",
+          "description-reconnect": "Autorização do Google está ausente; reconecte esta conta."
         },
         "calendar-event-date-format": {
           "description": "O formato de hora mostrado no cartão do evento para a data selecionada",
@@ -2424,14 +2507,14 @@
         },
         "calendar-storage": {
           "button": "Tentar Novamente",
-          "description-cancelled": "O prompt de armazenamento criptografado foi cancelado. Os eventos do calendário permanecerão disponíveis apenas nesta sessão.",
-          "description-error": "Não foi possível abrir ou salvar o cache criptografado de eventos do calendário.",
-          "description-locked": "O armazenamento criptografado está bloqueado ou o acesso foi negado. Corrija o acesso e tente novamente.",
-          "description-migration": "O cache de eventos do calendário em texto simples está aguardando criptografia. Ele será preservado até que a migração seja concluída com sucesso.",
-          "description-missing-key": "A chave de armazenamento criptografado configurada está ausente. Os arquivos de cache do calendário existentes foram preservados.",
-          "description-opening": "O cache criptografado de eventos do calendário está sendo aberto.",
-          "description-recovery": "O evento de calendário não pôde ser autenticado ou está danificado. Tente novamente depois de restaurar a chave correta, ou redefina o armazenamento privado.",
-          "description-unavailable": "Nenhum provedor do Secret Service está disponível. Os eventos do calendário permanecerão disponíveis apenas nesta sessão.",
+          "description-cancelled": "O prompt de armazenamento criptografado foi cancelado; eventos do calendário permanecerão disponíveis apenas nesta sessão",
+          "description-error": "Não foi possível abrir ou salvar o cache criptografado de eventos do calendário",
+          "description-locked": "Armazenamento criptografado está bloqueado ou o acesso foi negado; corrija o acesso e tente novamente",
+          "description-migration": "O cache de eventos do calendário em texto puro está aguardando criptografia; ele será preservado até que a migração seja bem sucedida",
+          "description-missing-key": "Faltando chave do cache de evento do calendário; As credenciais da conta utilizam um armazenamento separado (arquivos de cache existentes foram preservados)",
+          "description-opening": "O cache criptografado de eventos de calendário está sendo aberto",
+          "description-recovery": "O evento de calendário não pôde ser autenticado ou está danificado; tente novamente depois de restaurar a chave correta, ou redefina o armazenamento privado",
+          "description-unavailable": "Nenhum provedor do Secret Service está disponível; eventos de calendário permanecerão disponíveis apenas nesta sessão",
           "label": "Armazenamento de Eventos do Calendário"
         },
         "calendar-week-numbers": {
@@ -2525,7 +2608,7 @@
             "label": "Intervalo de Polling do Disco"
           },
           "gpu-poll": {
-            "description": "Segundos entre as coletas de temperatura da GPU, uso  e amostras da VRAM. Amostra da GPU são coletadas somente quando algo mostra estatísticas da GPU, ou seja, uma máquina em modo de espera nunca é acordada (0 desativa completamente)",
+            "description": "Segundos entre as coletas de temperatura da GPU, uso  e amostras da VRAM; Amostra da GPU são coletadas somente quando algo mostra estatísticas da GPU, ou seja, uma máquina em modo de espera nunca é acordada (0 desativa completamente)",
             "label": "Intervalo de Polling da GPU"
           },
           "label": "Monitor do Sistema",
@@ -2666,16 +2749,20 @@
           "label": "Comando de Ação de Imagem",
           "placeholder": "gimp {path} ou satty -f -"
         },
+        "clipboard-keep-from-closed-apps": {
+          "description": "Mantém o último item copiado para ser colado após o fechamento do aplicativo de onde foi copiado",
+          "label": "Manter Área de Transferência de Aplicativos Fechados"
+        },
         "clipboard-storage": {
           "button": "Tentar Novamente",
-          "description-cancelled": "O prompt do Secret Service foi cancelado. O histórico da área de transferência permanecerá disponível apenas nesta sessão.",
-          "description-error": "Não foi possível abrir ou salvar o histórico criptografado da área de transferência.",
-          "description-locked": "O armazenamento da chave da área de transferência está bloqueado ou o acesso foi negado. Corrija o acesso e tente novamente.",
-          "description-migration": "O histórico da área de transferência em texto simples está aguardando criptografia. Os arquivos existentes serão preservados até que a migração seja concluída com sucesso.",
-          "description-missing-key": "A chave de armazenamento criptografado configurada está ausente. Os arquivos existentes do histórico da área de transferência foram preservados.",
+          "description-cancelled": "O prompt do Secret Service foi cancelado; histórico da área de transferência permanecerá disponível apenas nesta sessão",
+          "description-error": "Não foi possível abrir ou salvar o histórico criptografado da área de transferência",
+          "description-locked": "Armazenamento da chave da área de transferência está bloqueado ou o acesso foi negado; corrija o acesso e tente novamente",
+          "description-migration": "Histórico da área de transferência em texto simples está aguardando criptografia; Os arquivos existentes serão preservados até que a migração seja  bem sucedida",
+          "description-missing-key": "A chave de armazenamento criptografado configurada está ausente; os arquivos existentes do histórico da área de transferência foram preservados.",
           "description-opening": "O histórico criptografado da área de transferência está sendo aberto.",
-          "description-recovery": "O histórico da área de transferência não pôde ser autenticado ou está danificado. Tente novamente depois de restaurar a chave correta, ou redefina o armazenamento privado.",
-          "description-unavailable": "Nenhum provedor do Secret Service está disponível. O histórico da área de transferência permanecerá disponível apenas nesta sessão.",
+          "description-recovery": "Histórico da área de transferência não pôde ser autenticado ou está danificado; tente novamente depois de restaurar a chave correta, ou redefina o armazenamento privado",
+          "description-unavailable": "Nenhum provedor do Secret Service está disponível; histórico da área de transferência permanecerá disponível apenas nesta sessão.",
           "label": "Armazenamento do Histórico da Área de Transferência"
         },
         "date-format": {
@@ -2693,6 +2780,10 @@
         "greeter-sync-privilege-command": {
           "description": "Substituir o pkexec/run0 pelo greeter Sync Now; o caminho do auxiliar de aplicação e o diretório de preparação são acrescentados automaticamente (exemplo: ghostty -e pkexec)",
           "label": "Comando Privilegiado de Sincronização de Greeter"
+        },
+        "keyboard-layout-custom-labels": {
+          "description": "Mapear nomes de layout de teclado usados pelo shell",
+          "label": "Rótulos de Layouts de Teclado"
         },
         "launch-apps-as-systemd-services": {
           "description": "Executa aplicativos em serviços systemd separados para que não compartilhem o cgroup do Noctalia",
@@ -2871,6 +2962,10 @@
           "description": "Envia o PNG capturado para um comando do shell em stdin",
           "label": "Pipe para Comando"
         },
+        "screenshot-remember-last-region": {
+          "description": "Pré-selecionar a última região(incluindo depois de cancelar) na próxima captura de tela por região",
+          "label": "Lembrar Última Região"
+        },
         "screenshot-save-to-file": {
           "description": "Salva as capturas de tela como arquivos PNG no diretório de saída",
           "label": "Salvar para Arquivo"
@@ -2878,6 +2973,10 @@
         "screenshot-show-cursor": {
           "description": "Incluir o ponteiro do mouse nas capturas de tela",
           "label": "Mostrar Cursor"
+        },
+        "settings-window-translucent": {
+          "description": "Torne o fundo das Configurações transparente para efeitos dos compositores",
+          "label": "Fundo Transparente das Configurações"
         },
         "show-location": {
           "description": "Exibe o nome do local nos widgets de previsão do tempo",
@@ -2914,7 +3013,7 @@
           "label": "Modelos Integrados"
         },
         "community-ids": {
-          "description": "Alterna a exibição em cache dos modelos da comunidade a cada alteração de tema",
+          "description": "Navegar e ativar modelos de comunidade aplicados em cada mudança de tema",
           "empty": "Ainda não há modelos da comunidade disponíveis. Primeiro, habilite os modelos de comunidade e atualize o catálogo.",
           "label": "Modelos da Comunidade"
         },
@@ -3009,7 +3108,7 @@
       }
     },
     "session-actions": {
-      "add": "Adicionar ação",
+      "add": "Adicionar Ação",
       "clear-glyph": "Apagar",
       "command-label": "Comando do Shell",
       "command-placeholder": "Comando bash opcional; deixe em branco para o comportamento padrão",
@@ -3035,11 +3134,29 @@
     "storage-recovery": {
       "button": "Redefinir Armazenamento Privado",
       "button-confirm": "Confirmar Redefinição de Armazenamento",
-      "description": "Apague permanentemente a área de transferência armazenada e o cache de evento de calendário, então re-abra o armazenamento privado. Um arquivo de chave configurado nunca é modificado.",
+      "description": "Permanentemente apaga histórico de área de transferência armazenado e o cache de evento de calendário, então reabra o armazenamento privado (um arquivo de chave configurado nunca é modificado)",
       "error-delete": "Alguns arquivos do armazenamento privado não puderam ser apagados. A chave de armazenamento foi preservada.",
       "error-key": "Arquivos do armazenamento privado foram apagados, mas o armazenamento seguro não pôde ser reaberto. Corrija o acesso e tente novamente.",
       "label": "Recuperar Armazenamento Privado",
       "success": "Redefinição do armazenamento privado bem sucedida"
+    },
+    "templates": {
+      "store": {
+        "browse": "Navegar pelos modelos",
+        "categories": "Categorias",
+        "category-all": "Todas",
+        "empty": "Não há modelos semelhantes ao seu filtro",
+        "enabled-count": "{count} ativados",
+        "filter-all": "Todos",
+        "filter-enabled": "Ativado",
+        "results-count": "{count} modelos",
+        "search-placeholder": "Buscar modelos...",
+        "sort-category-asc": "Ordenar por categoria (A-Z)",
+        "sort-category-desc": "Ordenar por categoria (Z-A)",
+        "sort-name-asc": "Ordenar por nome (A-Z)",
+        "sort-name-desc": "Ordenar por nome (Z-A)",
+        "title": "Modelos da Comunidade"
+      }
     },
     "widgets": {
       "actions": {
@@ -3089,9 +3206,9 @@
         "cpu-temp": "Temperatura da CPU",
         "cpu-usage": "Uso da CPU",
         "disk-free": "Disco Livre",
-        "disk-free-percent": "Porcentagem de Disco Livre",
+        "disk-free-percent": "Disco Livre %",
         "disk-used": "Disco Usado",
-        "disk-used-percent": "Porcentagem de Disco Usado",
+        "disk-used-percent": "Disco Usado %",
         "dots": "Pontos",
         "focus-hint": "Indicação de Foco",
         "full": "Cheio",
@@ -3119,14 +3236,16 @@
         "on-hover": "Ao Passar o Mouse",
         "output": "Saída",
         "percent": "Porcentagem",
-        "ram-percent": "Porcentagem de RAM",
+        "ram-percent": "RAM %",
         "ram-used": "Uso de RAM",
         "rate": "Consumo",
         "regular": "Normal",
         "replace": "Substituir",
+        "scroll-gesture": "Uma Vez por Gesto",
+        "scroll-steps": "Cada Etapa",
         "shared": "Compartilhado",
         "short": "Curto",
-        "swap-percent": "Porcentagem de Swap",
+        "swap-percent": "Swap %",
         "text": "Texto",
         "text-only": "Apenas Texto",
         "time": "Tempo",
@@ -3136,12 +3255,16 @@
       },
       "settings": {
         "actions": {
-          "description": "O que cada gesto do mouse faz neste widget. Escolha um comando, execute um comando do shell ou desative-o.",
+          "description": "O que cada gesto do mouse faz neste widget; escolha um comando, execute um comando do shell ou desative",
           "label": "Ações de Gesto"
         },
         "active-color": {
           "description": "Cor usada para indicadores de privacidade ativos; cores hex fixas também são suportadas",
           "label": "Cor Ativa"
+        },
+        "active-indicator-color": {
+          "description": "Cor do indicador abaixo do ícone da janela ativa",
+          "label": "Cor do Indicador de Ativo"
         },
         "active-opacity": {
           "description": "Opacidade do ícone da janela ativa (com foco)",
@@ -3181,7 +3304,7 @@
           "label": "Cápsula"
         },
         "capsule-border": {
-          "description": "Função de cor para o contorno da cápsula; cores hexadecimais fixas também são suportadas",
+          "description": "Cor para o contorno da cápsula; cores hexadecimais fixas também são suportadas",
           "label": "Borda da Cápsula"
         },
         "capsule-fill": {
@@ -3210,6 +3333,10 @@
           "description": "Centraliza as barras do visualizador em vez de alinhá-las à borda",
           "label": "Centralizado"
         },
+        "change-color-on-hover": {
+          "description": "Mude o preenchimento de espaço de trabalho e cores de rótulos quando o ponteiro pairar sobre",
+          "label": "Mudar Cor ao Passar o Mouse"
+        },
         "color": {
           "description": "Cor do ícone e rótulo deste widget; cores hexadecimais fixas também são suportadas",
           "label": "Cor"
@@ -3231,12 +3358,8 @@
           "description": "Colorir a imagem personalizada com a configuração de Cor do Ícone do widget",
           "label": "Colorir Imagem Personalizada"
         },
-        "custom-labels": {
-          "description": "Mapeia nomes de layouts de teclado para rótulos personalizados",
-          "label": "Rótulos Personalizados"
-        },
         "detached-panel": {
-          "description": "Abre o drawer como um painel flutuante com seu próprio fundo, em vez de se mesclar com a barra",
+          "description": "Abre o drawer como um painel flutuante ao invés de ancorá-lo à extremidade da barra",
           "label": "Painel Descolado"
         },
         "device": {
@@ -3313,7 +3436,7 @@
           "label": "Agrupar por Espaço de Trabalho"
         },
         "group-single-icon-per-app": {
-          "description": "Ao agrupar por espaço de trabalho com ícones, recolha várias janelas do mesmo app num único ícone com um indicador de contagem.",
+          "description": "Ao agrupar por espaço de trabalho com ícones, recolha várias janelas do mesmo app num único ícone com um indicador de contagem",
           "label": "Ícone único por App"
         },
         "height": {
@@ -3430,6 +3553,10 @@
           "description": "Mostrar unidades como porcentagem / GiB / °C",
           "label": "Mostrar Unidades"
         },
+        "label-source": {
+          "description": "What workspace labels show*",
+          "label": "Fonte do Rótulo*"
+        },
         "labels-only-when-occupied": {
           "description": "Oculta rótulos de espaços de trabalho vazios e inativos",
           "label": "Rótulos Somente Quando Ocupado",
@@ -3505,7 +3632,7 @@
         "pinned": {
           "description": "IDs dos itens do tray que permanecem visíveis na barra com o modo drawer ativado",
           "label": "Itens Fixados",
-          "taskbar-description": "Apps de área de trabalho que permanecem na barra de tarefas quando não estão em execução. Ignorados quando Agrupar por Espaço de Trabalho está ativada.",
+          "taskbar-description": "Apps de área de trabalho que permanecem na barra de tarefas quando não estão em execução; Ignorados quando Agrupar por Espaço de Trabalho está ativada",
           "taskbar-label": "Apps Fixados"
         },
         "pinned-opacity": {
@@ -3523,6 +3650,10 @@
         "script": {
           "description": "Caminho para o script lua",
           "label": "Script"
+        },
+        "scroll-repeat": {
+          "description": "Escolha se ações de rolagem seguem semânticas de comando, executa uma vez por gesto ou repete para cada etapa de rolagem",
+          "label": "Repetição de Rolagem"
         },
         "show-active-indicator": {
           "description": "Exibir um pequeno ponto abaixo do ícone da janela ativa na barra de tarefas",
@@ -3544,13 +3675,17 @@
           "description": "Exibe o placeholder quando nenhuma janela estiver em foco, em vez de ocultar o widget",
           "label": "Mostrar Rótulo Vazio"
         },
-        "show-icon": {
-          "description": "Exibe o ícone deste widget",
-          "label": "Exibir Ícone"
+        "show-glyph": {
+          "description": "Mostrar o símbolo do widget ou imagem personalizada",
+          "label": "Mostrar Símbolo"
         },
         "show-label": {
-          "description": "Exibe texto ao lado do ícone",
+          "description": "Exibe texto do rótulo do widget",
           "label": "Exibir Rótulo"
+        },
+        "show-labels": {
+          "description": "Mostrar rótulos nos espaços de trabalho",
+          "label": "Mostrar Rótulos"
         },
         "show-num-lock": {
           "description": "Exibe estado do Num Lock",
@@ -3564,8 +3699,16 @@
           "description": "Mostrar texto com temperatura atual",
           "label": "Exibir Temperatura"
         },
+        "show-unlock-hint": {
+          "description": "Exibir o cartão de status acima da caixa de login para dicas de desbloqueio e prompts de autenticação; Erros e avisos de Caps Lock ainda aparecem quando isto está desligado",
+          "label": "Dica de Desbloqueio"
+        },
+        "show-value": {
+          "description": "Mostrar o valor atual próximo à visualização",
+          "label": "Mostrar Valor"
+        },
         "show-vpn-label": {
-          "description": "Mostrar nome de VPN: substitui rótulo de rede em modo de substituição, adiciona rótulo próximo ao ícone de VPN em ambos modos",
+          "description": "Substitui rótulo de rede com rótulo da VPN em modo Substituir; adiciona rótulo VPN próximo ao ícone de VPN no modo Ambos",
           "label": "Mostrar Rótulo VPN"
         },
         "show-when-idle": {
@@ -3625,8 +3768,12 @@
           "description": "Formato opcional usado em barras verticais",
           "label": "Formato vertical"
         },
+        "visualization": {
+          "description": "Mostrar",
+          "label": "Visualização"
+        },
         "vpn-status": {
-          "description": "Como mostrar o status da VPN: troca o ícone de rede para um escudo VPN, ambos mostrar lado a lado, oculto desativa o indicador da VPN",
+          "description": "Como mostrar o status da VPN:  Substituir troca o ícone de rede por um escudo VPN, Ambos mostra-os lado a lado, Oculto desativa o indicador da VPN",
           "label": "Estado da VPN"
         },
         "warning-color": {
@@ -3699,6 +3846,20 @@
       "native-title": "Configurações do Noctalia",
       "no-results": "Nenhuma configuração encontrada",
       "no-results-hint": "Tente um nome diferente de configuração ou uma tecla de config.",
+      "offline-mode-notice": {
+        "appearance": "O download de paletas da comunidade não funcionará.",
+        "calendar-account": "A descoberta e sincronização do calendário não funcionarão.",
+        "disable-hint": "Desative o Modo Off-line na seção Segurança.",
+        "launcher": "A busca de taxas de câmbio não funcionará.",
+        "location": "As consultas de clima e localização não funcionarão.",
+        "plugin-store": "As solicitações de catálogo e download de plugins remotos não funcionarão.",
+        "plugins": "As solicitações HTTP de plugins não funcionarão. Fontes Git ainda podem ser atualizadas.",
+        "security": "A consulta de IP externo e a telemetria não funcionarão.",
+        "services": "A sincronização da conta do calendário não funcionará.",
+        "template-store": "O download de modelos da comunidade não funcionará.",
+        "templates": "Os download e atualizações de modelos da comunidade não funcionarão.",
+        "title": "Modo Off-line"
+      },
       "reset-page": "Redefinir Página",
       "reset-page-confirm": "Confirmar Reinício",
       "search-placeholder": "Pesquisar configurações...",

@@ -2,6 +2,7 @@
 
 #include "config/config_migrations.h"
 #include "config/config_types.h"
+#include "config/schema/diagnostics.h"
 #include "config/state_store.h"
 #include "core/timer_manager.h"
 #include "core/toml.h"
@@ -47,6 +48,7 @@ public:
 
   [[nodiscard]] const Config& config() const noexcept { return m_config; }
   [[nodiscard]] bool isLockScreenEnabled() const noexcept { return ::isLockScreenEnabled(m_config.lockscreen); }
+  [[nodiscard]] bool shouldLockBeforeSuspend() const noexcept { return ::shouldLockBeforeSuspend(m_config.lockscreen); }
   // Which sections changed in the reload currently being dispatched. Valid while
   // reload callbacks run; subscribers consult it to skip unaffected work.
   [[nodiscard]] const ConfigChangeSet& lastChange() const noexcept { return m_lastChange; }
@@ -80,6 +82,9 @@ public:
 
   // Persisted wallpaper paths (written to settings.toml, app-managed).
   [[nodiscard]] std::string getWallpaperPath(const std::string& connectorName) const;
+  [[nodiscard]] const std::unordered_map<std::string, std::string>& monitorWallpaperPaths() const {
+    return m_monitorWallpaperPaths;
+  }
   [[nodiscard]] std::string getDefaultWallpaperPath() const;
   // Last applied wallpaper, else default. Drives palette generation and template previews.
   [[nodiscard]] std::string getPaletteWallpaperPath() const;
@@ -131,6 +136,12 @@ public:
   bool markSetupWizardCompleted();
   [[nodiscard]] bool hasOverride(const std::vector<std::string>& path) const;
   [[nodiscard]] bool hasEffectiveOverride(const std::vector<std::string>& path) const;
+  // Lane content as the settings GUI presents it: the widget list plus the capsule groups it
+  // references, so moving a widget into a lane's group still reports the lane as overridden.
+  [[nodiscard]] bool hasEffectiveBarLaneOverride(const std::vector<std::string>& lanePath) const;
+  // Reverts a lane to the config file: drops the lane-list override and restores the capsule groups
+  // that lane references, leaving groups owned by other lanes alone.
+  bool resetBarLaneOverride(const std::vector<std::string>& lanePath, bool* changed = nullptr);
   [[nodiscard]] bool isOverrideOnlyBar(std::string_view name) const;
   [[nodiscard]] bool isOverrideOnlyCalendarAccount(std::string_view id) const;
   [[nodiscard]] bool canMoveBarOverride(std::string_view name, int direction) const;
@@ -180,6 +191,8 @@ private:
   // config-file lane whose group token the override no longer defines. Rewrites the affected
   // arrays in `candidate` so every referenced group resolves again.
   void reconcileCapsuleGroupOverrides(toml::table& candidate) const;
+  // Validates `next`, persists it, and reloads. `changed` reports whether anything moved.
+  bool commitOverrideTable(toml::table next, bool* changed);
   void setupWatch();
   // Reconciles inotify watches for [include]d files: watches the parent dir of
   // every loaded file plus every directory named in an [include].files list, and
@@ -187,7 +200,22 @@ private:
   void refreshIncludeWatches();
   void fireReloadCallbacks();
   void loadOverridesFromFile();
-  void setConfigParseError(std::string parseError);
+  // A config problem kept as location + text rather than one pre-joined string:
+  // the on-screen notification puts the location in its title and the text in
+  // its body. `message` is "<dotted.path>: <problem>" and never carries a location.
+  struct ConfigProblem {
+    noctalia::config::schema::SourceOrigin origin;
+    std::string message;
+
+    [[nodiscard]] bool empty() const { return message.empty(); }
+    // Single-line form for logs and the settings status banner.
+    [[nodiscard]] std::string flatten(std::string_view baseDir) const { return origin.prefixedShort(baseDir, message); }
+    [[nodiscard]] static ConfigProblem from(const noctalia::config::schema::Diagnostics::Entry& entry) {
+      return ConfigProblem{entry.origin, entry.path + ": " + entry.message};
+    }
+  };
+
+  void setConfigParseError(ConfigProblem problem);
   void updateLegacyConfigIssues(noctalia::config::LegacyConfigIssues issues);
   void notifyLegacyConfigIssues();
   bool writeOverridesToFile();
@@ -223,8 +251,8 @@ private:
   std::vector<WallpaperFavorite> m_wallpaperFavorites;
   mutable std::unordered_map<std::string, bool> m_effectiveOverrideCache;
 
-  std::string m_overridesParseError;
-  std::string m_pendingError; // parse error from initial load, sent as notification once manager is wired up
+  ConfigProblem m_overridesParseError;
+  ConfigProblem m_pendingError;             // parse error from initial load, notified once the manager is wired up
   uint32_t m_configErrorNotificationId = 0; // ID of the active config-error notification, 0 if none
   noctalia::config::LegacyConfigIssues m_legacyConfigIssues;
   std::string m_loggedLegacyIssueFingerprint;

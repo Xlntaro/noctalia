@@ -19,7 +19,9 @@
 #include "shell/settings/settings_content_plugins.h"
 #include "shell/settings/settings_control_factory.h"
 #include "shell/settings/settings_window.h"
+#include "shell/settings/template_store_content.h"
 #include "shell/settings/widget_settings_registry.h"
+#include "theme/community_templates.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/context_menu.h"
@@ -42,6 +44,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -333,8 +336,8 @@ void SettingsWindow::openActionsMenu() {
        .hasSubmenu = false}
   );
 
-  float anchorAbsX = 0.0f;
-  float anchorAbsY = 0.0f;
+  float anchorAbsX = 0.0F;
+  float anchorAbsY = 0.0F;
   Node::absolutePosition(m_actionsMenuButton, anchorAbsX, anchorAbsY);
 
   const float scale = uiScale();
@@ -349,7 +352,7 @@ void SettingsWindow::openActionsMenu() {
   m_actionsMenuPopup->open(
       ContextMenuPopupRequest{
           .entries = std::move(entries),
-          .minMenuWidth = 220.0f * scale,
+          .minMenuWidth = 220.0F * scale,
           .maxMenuWidth = Style::menuAutoMaxWidth * scale,
           .maxVisible = 8,
           .anchor =
@@ -1124,6 +1127,12 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
   }
 
   auto populateSheetBody = [this, draft, scale](Flex& body) mutable {
+    if (m_config != nullptr && m_config->config().shell.offlineMode) {
+      body.addChild(
+          settings::makeOfflineModeNotice(scale, i18n::tr("settings.window.offline-mode-notice.calendar-account"))
+      );
+    }
+
     auto addField = [scale](Flex& parent, const std::string& label, std::unique_ptr<Node> control) {
       auto field = ui::column({
           .align = FlexAlign::Stretch,
@@ -1349,7 +1358,7 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
           .align = FlexAlign::Stretch,
           .gap = Style::spaceXs * scale,
           .padding = Style::spaceSm * scale,
-          .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.35f),
+          .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.35F),
           .radius = Style::scaledRadiusMd(scale),
       });
       for (const CalendarSource& source : draft->discoveredCalendars) {
@@ -1361,8 +1370,8 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
         });
         auto info = ui::column({
             .align = FlexAlign::Start,
-            .gap = 2.0f * scale,
-            .flexGrow = 1.0f,
+            .gap = 2.0F * scale,
+            .flexGrow = 1.0F,
         });
         info->addChild(
             ui::label({
@@ -1952,14 +1961,7 @@ void SettingsWindow::openPluginSettingsEditor(std::string pluginId) {
       return;
     }
     const auto* manifest = scripting::PluginRegistry::instance().findManifest(pluginId);
-    if (manifest == nullptr) {
-      return;
-    }
-    const bool hasSettings =
-        !manifest->settings.empty() || std::ranges::any_of(manifest->entries, [](const scripting::PluginEntry& entry) {
-          return entry.kind == scripting::PluginEntryKind::Panel && !entry.settings.empty();
-        });
-    if (!hasSettings) {
+    if (manifest == nullptr || !settings::pluginHasSettings(*manifest)) {
       return;
     }
 
@@ -2153,16 +2155,23 @@ void SettingsWindow::openPluginStore() {
                 return actions;
               },
               .populateSheetBody =
-                  [storeContent, this](Flex& body) {
+                  [storeContent, this, scale](Flex& body) {
                     if (m_renderContext == nullptr) {
                       return;
                     }
-                    storeContent->populateBody(body, *m_renderContext, nullptr);
+                    if (m_config != nullptr && m_config->config().shell.offlineMode) {
+                      body.addChild(
+                          settings::makeOfflineModeNotice(
+                              scale, i18n::tr("settings.window.offline-mode-notice.plugin-store")
+                          )
+                      );
+                    }
+                    storeContent->populateBody(body, *m_renderContext, m_asyncTextures);
                   },
               .scale = scale,
-              .minWidth = 800.0f,
-              .maxWidth = 1100.0f,
-              .parentFraction = 0.85f,
+              .minWidth = 800.0F,
+              .maxWidth = 1100.0F,
+              .parentFraction = 0.85F,
               .fillParentHeight = true,
               .scrollableBody = false,
               .onCloseRequested = [storeContent]() -> bool {
@@ -2183,6 +2192,86 @@ void SettingsWindow::openPluginStore() {
       );
     });
   }).detach();
+}
+
+void SettingsWindow::openCommunityTemplateStore() {
+  if (m_config == nullptr
+      || m_wayland == nullptr
+      || m_renderContext == nullptr
+      || m_surface == nullptr
+      || m_surface->xdgSurface() == nullptr) {
+    return;
+  }
+
+  if (m_editorSheetPopup != nullptr && m_editorSheetPopup->isOpen()) {
+    m_editorSheetPopup->close();
+  }
+
+  if (m_editorSheetPopup == nullptr) {
+    m_editorSheetPopup = std::make_unique<settings::SettingsSheetPopup>();
+    m_editorSheetPopup->initialize(*m_wayland, *m_config, *m_renderContext);
+  }
+
+  const float scale = uiScale();
+  auto catalog = noctalia::theme::CommunityTemplateService::availableTemplates();
+  std::unordered_set<std::string> selectedIds(
+      m_config->config().theme.templates.communityIds.begin(), m_config->config().theme.templates.communityIds.end()
+  );
+
+  auto storeContent = std::make_shared<settings::TemplateStoreContent>(
+      std::move(catalog), std::move(selectedIds), m_config,
+      settings::TemplateStoreCallbacks{
+          .setSelected = [this](
+                             std::vector<std::string> ids
+                         ) { setSettingOverride({"theme", "templates", "community_ids"}, std::move(ids)); },
+          .scale = scale,
+      }
+  );
+
+  storeContent->setOnRebuildNeeded([this]() {
+    if (m_editorSheetPopup != nullptr) {
+      m_editorSheetPopup->rebuildBody();
+    }
+  });
+
+  wl_output* output = m_wayland->lastPointerOutput();
+  if (output == nullptr) {
+    output = m_output;
+  }
+
+  m_editorSheetPopup->open(
+      settings::SettingsSheetPopupRequest{
+          .parent = popupParentFor(*m_surface, output, m_wayland->lastInputSerial()),
+          .sheetTitle = i18n::tr("settings.templates.store.title"),
+          .removeAction = nullptr,
+          .createHeaderAction = nullptr,
+          .populateSheetBody =
+              [storeContent, this, scale](Flex& body) {
+                if (m_renderContext == nullptr) {
+                  return;
+                }
+                if (m_config != nullptr && m_config->config().shell.offlineMode) {
+                  body.addChild(
+                      settings::makeOfflineModeNotice(
+                          scale, i18n::tr("settings.window.offline-mode-notice.template-store")
+                      )
+                  );
+                }
+                storeContent->populateBody(body, *m_renderContext);
+              },
+          .scale = scale,
+          .minWidth = 720.0F,
+          .maxWidth = 1000.0F,
+          .parentFraction = 0.85F,
+          .fillParentHeight = true,
+          .scrollableBody = false,
+          .preDispatchKeyboard =
+              [storeContent, this](const KeyboardEvent& event) {
+                InputArea* focused = m_editorSheetPopup != nullptr ? m_editorSheetPopup->focusedArea() : nullptr;
+                return storeContent->handleKeyEvent(event.sym, event.modifiers, event.pressed, event.preedit, focused);
+              },
+      }
+  );
 }
 
 void SettingsWindow::closeWidgetInspectorPopup() {

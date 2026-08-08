@@ -2,6 +2,7 @@
 
 #include "render/scene/node.h"
 #include "render/scene/rect_node.h"
+#include "ui/builders.h"
 #include "ui/controls/box.h"
 #include "ui/style.h"
 #include "wayland/popup_surface.h"
@@ -14,7 +15,7 @@ namespace {
 
   constexpr std::int32_t kShadowSafetyPadding = 2;
 
-  std::uint32_t extentFor(float value) noexcept { return static_cast<std::uint32_t>(std::max(1.0f, std::ceil(value))); }
+  std::uint32_t extentFor(float value) noexcept { return static_cast<std::uint32_t>(std::max(1.0F, std::ceil(value))); }
 
   int roundedInt(float value) noexcept { return static_cast<int>(std::lround(value)); }
 
@@ -35,8 +36,8 @@ namespace popup_chrome {
       float contentWidth, float contentHeight, const ShellConfig::ShadowConfig& shadow, bool componentShadow
   ) noexcept {
     Geometry geometry{
-        .contentWidth = std::max(1.0f, contentWidth),
-        .contentHeight = std::max(1.0f, contentHeight),
+        .contentWidth = std::max(1.0F, contentWidth),
+        .contentHeight = std::max(1.0F, contentHeight),
     };
 
     if (shell::surface_shadow::enabled(componentShadow, shadow)) {
@@ -64,7 +65,7 @@ namespace popup_chrome {
     case HorizontalAttachment::Center:
       return baseOffset
           + static_cast<std::int32_t>(
-                 std::lround(static_cast<float>(geometry.bleed.right - geometry.bleed.left) * 0.5f)
+                 std::lround(static_cast<float>(geometry.bleed.right - geometry.bleed.left) * 0.5F)
           );
     }
     return baseOffset;
@@ -79,7 +80,7 @@ namespace popup_chrome {
       return baseOffset + geometry.bleed.down;
     case VerticalAttachment::Center:
       return baseOffset
-          + static_cast<std::int32_t>(std::lround(static_cast<float>(geometry.bleed.down - geometry.bleed.up) * 0.5f));
+          + static_cast<std::int32_t>(std::lround(static_cast<float>(geometry.bleed.down - geometry.bleed.up) * 0.5F));
     }
     return baseOffset;
   }
@@ -119,8 +120,8 @@ namespace popup_chrome {
   }
 
   Box* addCardBackground(Node& parent, const Geometry& geometry, float contentScale) {
-    auto box = std::make_unique<Box>();
-    box->setCardStyle(contentScale, 1.0f, Style::popupBordersEnabled());
+    auto box = ui::box({});
+    box->setCardStyle(contentScale, 1.0F, Style::popupBordersEnabled());
     box->setRadius(Style::scaledRadiusLg(contentScale));
     box->setPosition(geometry.contentX(), geometry.contentY());
     box->setFrameSize(geometry.contentWidth, geometry.contentHeight);

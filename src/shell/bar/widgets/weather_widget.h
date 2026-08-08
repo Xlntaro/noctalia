@@ -18,8 +18,6 @@ public:
     int maxWidth = 160;
     bool showCondition = true;
     bool showTemperature = true;
-
-    bool operator==(const Options&) const = default;
   };
 
   WeatherWidget(WeatherService* weather, wl_output* output, Options options);
@@ -32,7 +30,7 @@ private:
   void sync(Renderer& renderer);
 
   WeatherService* m_weather = nullptr;
-  float m_maxWidth = 160.0f;
+  float m_maxWidth = 160.0F;
   bool m_showCondition = true;
   bool m_showTemperature = true;
   InputArea* m_area = nullptr;

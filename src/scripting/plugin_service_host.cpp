@@ -3,6 +3,7 @@
 #include "core/log.h"
 #include "i18n/i18n.h"
 #include "notification/notifications.h"
+#include "scripting/plugin_api.h"
 #include "scripting/plugin_ipc.h"
 #include "scripting/plugin_manifest.h"
 #include "scripting/plugin_registry.h"
@@ -76,6 +77,9 @@ namespace scripting {
       if (token == nullptr || !*token) {
         return;
       }
+      if (result.modulePathsKnown) {
+        svc->scriptWatcher.setModulePaths(result.modulePaths);
+      }
       if (result.patch.updateIntervalMs.has_value()) {
         const int next = std::max(16, *result.patch.updateIntervalMs);
         if (next != svc->updateIntervalMs) {
@@ -109,7 +113,7 @@ namespace scripting {
     return service;
   }
 
-  void PluginServiceHost::stopService(Service& service) {
+  void PluginServiceHost::stopService(Service& service, ScriptExitReason exitReason) {
     PluginIpcRouter::instance().unregisterEndpoint(&service);
     teardownScriptWatch(service);
     service.updateTimer.stop();
@@ -121,7 +125,7 @@ namespace scripting {
         service.runtime->unsubscribe(service.subscription);
         service.subscription = 0;
       }
-      service.runtime->stop();
+      service.runtime->stop(exitReason);
     }
   }
 
@@ -215,6 +219,23 @@ namespace scripting {
     }
   }
 
+  void PluginServiceHost::enablePlugin(std::string_view pluginId) {
+    const std::string entryPrefix = std::string(pluginId) + ":";
+    for (const auto& service : m_services) {
+      if (!service->entryId.starts_with(entryPrefix) || service->runtime == nullptr) {
+        continue;
+      }
+      const auto entry = PluginRegistry::instance().resolve(service->entryId);
+      if (!entry.has_value()
+          || entry->manifest == nullptr
+          || entry->manifest->pluginApiVersion < kServiceLifecyclePluginApiVersion) {
+        continue;
+      }
+      kLog.info("enabling service '{}'", service->entryId);
+      (void)service->runtime->enqueueCall("onEnable", {});
+    }
+  }
+
   void PluginServiceHost::onOutputChange() {
     for (auto& service : m_services) {
       if (service->runtime != nullptr) {
@@ -224,22 +245,11 @@ namespace scripting {
   }
 
   void PluginServiceHost::setupScriptWatch(Service& service) {
-    if (service.watchId != 0 || service.sourcePath.empty() || m_fileWatcher == nullptr) {
-      return;
-    }
     Service* svc = &service;
-    service.watchId = m_fileWatcher->watch(
-        service.sourcePath, [this, svc] { reloadService(*svc); }, FileWatcher::WatchTrigger::WriteCompleted
-    );
+    service.scriptWatcher.start(m_fileWatcher, service.sourcePath, [this, svc] { reloadService(*svc); });
   }
 
-  void PluginServiceHost::teardownScriptWatch(Service& service) {
-    if (service.watchId == 0 || m_fileWatcher == nullptr) {
-      return;
-    }
-    m_fileWatcher->unwatch(service.watchId);
-    service.watchId = 0;
-  }
+  void PluginServiceHost::teardownScriptWatch(Service& service) { service.scriptWatcher.stop(); }
 
   void PluginServiceHost::reloadService(Service& service) {
     std::string code = readFile(service.sourcePath);

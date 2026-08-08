@@ -32,8 +32,8 @@ namespace {
   BarWidgetMenuAnchor barWidgetContextMenuAnchor(
       std::string_view barPosition, float widgetX, float widgetY, float widgetW, float widgetH, float contentScale
   ) {
-    const float centerX = widgetX + (widgetW * 0.5f);
-    const float centerY = widgetY + (widgetH * 0.5f);
+    const float centerX = widgetX + (widgetW * 0.5F);
+    const float centerY = widgetY + (widgetH * 0.5F);
     const std::int32_t gap = std::max(2, static_cast<std::int32_t>(std::lround(Style::spaceMd * contentScale)));
     const std::int32_t iconSize =
         std::clamp(static_cast<std::int32_t>(std::lround(std::max(widgetW, widgetH))), 16, 40);
@@ -132,7 +132,7 @@ bool ScreenshotWidget::onPointerEvent(const PointerEvent& event) {
 }
 
 void ScreenshotWidget::create() {
-  auto area = std::make_unique<InputArea>();
+  auto area = ui::inputArea({});
   m_hitArea = area.get();
   // Left is a declared gesture action; right stays here because the capture menu is a popup
   // anchored to this widget.
@@ -227,14 +227,14 @@ void ScreenshotWidget::openCaptureMenu() {
     }
   });
 
-  float absX = 0.0f;
-  float absY = 0.0f;
+  float absX = 0.0F;
+  float absY = 0.0F;
   Node::absolutePosition(m_hitArea, absX, absY);
   const auto& area = *m_hitArea;
   const auto menuAnchor =
       barWidgetContextMenuAnchor(m_barPosition, absX, absY, area.width(), area.height(), m_contentScale);
 
-  constexpr float kMenuWidth = 246.0f;
+  constexpr float kMenuWidth = 246.0F;
   const std::size_t maxVisible = std::max<std::size_t>(1, entries.size());
   m_menuPopup->open(
       ContextMenuPopupRequest{

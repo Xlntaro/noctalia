@@ -17,7 +17,7 @@ namespace {
 ThemeModeWidget::ThemeModeWidget(noctalia::theme::ThemeService* themeService) : m_themeService(themeService) {}
 
 void ThemeModeWidget::create() {
-  auto area = std::make_unique<InputArea>();
+  auto area = ui::inputArea({});
   m_area = area.get();
 
   area->addChild(
@@ -72,7 +72,7 @@ void ThemeModeWidget::syncState(Renderer& renderer) {
   m_glyph->measure(renderer);
 
   if (auto* node = root(); node != nullptr) {
-    node->setOpacity(isLight ? 1.0f : 0.85f);
+    node->setOpacity(isLight ? 1.0F : 0.85F);
   }
   requestRedraw();
 }

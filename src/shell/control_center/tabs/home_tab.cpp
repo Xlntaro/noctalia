@@ -3,6 +3,7 @@
 #include "config/config_service.h"
 #include "core/build_info.h"
 #include "core/deferred_call.h"
+#include "core/files/directory_scanner.h"
 #include "core/input/keybind_matcher.h"
 #include "core/log.h"
 #include "cursor-shape-v1-client-protocol.h"
@@ -14,6 +15,7 @@
 #include "render/animation/animation_manager.h"
 #include "render/core/async_texture_cache.h"
 #include "render/scene/input_area.h"
+#include "scripting/plugin_registry.h"
 #include "shell/control_center/shortcut_registry.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
@@ -43,21 +45,21 @@ namespace {
 
   constexpr Logger kLog("control-center");
 
-  constexpr float kHomeAvatarScale = 2.6f;
+  constexpr float kHomeAvatarScale = 2.6F;
   // Avatar sources above this size decode noticeably slowly; warn so users understand why.
   constexpr std::uintmax_t kHomeAvatarSourceWarnBytes = 8ULL * 1024ULL * 1024ULL;
   // Bottom row split: media/clock column grows more than the shortcuts column so the row feels balanced
   // (tweak either value slightly if needed).
-  constexpr float kHomeMainColumnFlexGrow = 1.66f;
-  constexpr float kHomeShortcutsFlexGrow = 1.0f;
+  constexpr float kHomeMainColumnFlexGrow = 1.66F;
+  constexpr float kHomeShortcutsFlexGrow = 1.0F;
   // Left-column card height split (media above, clock/weather below).
-  constexpr float kHomeMediaCardFlexGrow = 1.4f;
-  constexpr float kHomeDateTimeCardFlexGrow = 1.0f;
+  constexpr float kHomeMediaCardFlexGrow = 1.4F;
+  constexpr float kHomeDateTimeCardFlexGrow = 1.0F;
   constexpr std::size_t kHomeShortcutGridColumns = 2;
   // At or below this count the shortcuts stack in a single narrow column instead of the 2-column grid.
   constexpr std::size_t kHomeStackedShortcutMax = 2;
   // Square tiles are trimmed slightly (height = width * trim) so the grid stays compact.
-  constexpr float kHomeShortcutSquareTrim = 0.82f;
+  constexpr float kHomeShortcutSquareTrim = 0.82F;
   constexpr auto kHomeTransientPositionRegressionWindow = std::chrono::milliseconds(1500);
   constexpr std::int64_t kHomeTransientPositionRegressionFloorUs = 5'000'000;
   constexpr std::int64_t kHomeTransientPositionRegressionCeilingUs = 1'500'000;
@@ -70,11 +72,11 @@ namespace {
   // as one cell of the standard 2-column grid, rather than stretching across the whole column.
   float homeStackedShortcutsWidth(float contentWidth, float bottomRowGap, const GridView& grid) {
     const float totalGrow = kHomeMainColumnFlexGrow + kHomeShortcutsFlexGrow;
-    const float fullGridWidth = std::max(1.0f, contentWidth - bottomRowGap) * (kHomeShortcutsFlexGrow / totalGrow);
+    const float fullGridWidth = std::max(1.0F, contentWidth - bottomRowGap) * (kHomeShortcutsFlexGrow / totalGrow);
     const float horizontalPadding = grid.paddingLeft() + grid.paddingRight();
-    const float fullGridInnerWidth = std::max(1.0f, fullGridWidth - horizontalPadding);
+    const float fullGridInnerWidth = std::max(1.0F, fullGridWidth - horizontalPadding);
     const float cellWidth = std::max(
-        1.0f,
+        1.0F,
         (fullGridInnerWidth - grid.columnGap() * static_cast<float>(kHomeShortcutGridColumns - 1))
             / static_cast<float>(kHomeShortcutGridColumns)
     );
@@ -84,7 +86,7 @@ namespace {
   // The 2-column shortcuts grid's natural width = its flex share of the bottom row.
   float homeShortcutsGridNaturalWidth(float contentWidth, float bottomRowGap) {
     const float totalGrow = kHomeMainColumnFlexGrow + kHomeShortcutsFlexGrow;
-    return std::max(1.0f, contentWidth - bottomRowGap) * (kHomeShortcutsFlexGrow / totalGrow);
+    return std::max(1.0F, contentWidth - bottomRowGap) * (kHomeShortcutsFlexGrow / totalGrow);
   }
 
   std::filesystem::path avatarStartDirectory(const AccountsService* accounts, const ConfigService* config) {
@@ -127,7 +129,7 @@ namespace {
   void applyShortcutButtonStyle(Button& button, bool enabled, bool active, float fillOpacity) {
     const bool on = enabled && active;
     button.setVariant(on ? ButtonVariant::Primary : ButtonVariant::Default);
-    button.setSurfaceOpacity(on ? 1.0f : fillOpacity);
+    button.setSurfaceOpacity(on ? 1.0F : fillOpacity);
     button.setEnabled(enabled);
   }
 
@@ -148,7 +150,7 @@ namespace {
     if (avatar == nullptr) {
       return;
     }
-    const float borderWidth = Style::borderWidth * 3.0f;
+    const float borderWidth = Style::borderWidth * 3.0F;
     if (highlighted) {
       avatar->setBorder(colorSpecFromRole(ColorRole::Hover), borderWidth);
       return;
@@ -208,12 +210,12 @@ std::unique_ptr<Flex> HomeTab::create() {
       .out = &m_userCard,
       .justify = FlexJustify::Center,
       .fillHeight = true,
-      .flexGrow = 1.0f,
+      .flexGrow = 1.0F,
       .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applyHomeCardStyle(card, scale, opacity); },
   });
 
   {
-    const float wallpaperRadius = std::max(0.0f, Style::scaledRadiusXl(scale) - Style::borderWidth);
+    const float wallpaperRadius = std::max(0.0F, Style::scaledRadiusXl(scale) - Style::borderWidth);
     userCard->addChild(
         ui::image({
             .out = &m_wallpaperPlaceholder,
@@ -232,7 +234,7 @@ std::unique_ptr<Flex> HomeTab::create() {
             .participatesInLayout = false,
             .configure = [](Image& image) {
               image.setZIndex(-1);
-              image.setOpacity(0.0f);
+              image.setOpacity(0.0F);
             },
         })
     );
@@ -248,7 +250,7 @@ std::unique_ptr<Flex> HomeTab::create() {
     options.mode = FileDialogMode::Open;
     options.defaultViewMode = FileDialogViewMode::Grid;
     options.title = i18n::tr("control-center.home.select-avatar");
-    options.extensions = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"};
+    options.extensions = DirectoryScanner::imageExtensionFilter(false);
     options.startDirectory = avatarStartDirectory(m_accounts, m_config);
 
     (void)FileDialog::open(std::move(options), [this](std::optional<std::filesystem::path> pickedPath) {
@@ -270,7 +272,7 @@ std::unique_ptr<Flex> HomeTab::create() {
     });
   };
 
-  auto avatarArea = std::make_unique<InputArea>();
+  auto avatarArea = ui::inputArea({});
   avatarArea->setSize(avatarSize, avatarSize);
   avatarArea->setHitShape(InputArea::HitShape::Circle);
   avatarArea->setFocusable(true);
@@ -286,12 +288,12 @@ std::unique_ptr<Flex> HomeTab::create() {
       ui::image({
           .out = &m_userAvatar,
           .fit = ImageFit::Cover,
-          .radius = avatarSize * 0.5f,
-          .padding = 1.0f * scale,
+          .radius = avatarSize * 0.5F,
+          .padding = 1.0F * scale,
           .width = avatarSize,
           .height = avatarSize,
           .configure = [](Image& image) {
-            image.setBorder(colorSpecFromRole(ColorRole::Primary), Style::borderWidth * 3.0f);
+            image.setBorder(colorSpecFromRole(ColorRole::Primary), Style::borderWidth * 3.0F);
             image.setHitTestVisible(false);
             image.setAsyncReadyCallback([]() { PanelManager::instance().refresh(); });
           },
@@ -308,7 +310,7 @@ std::unique_ptr<Flex> HomeTab::create() {
   avatarArea->setOnFocusGain(syncAvatarChrome);
   avatarArea->setOnFocusLoss(syncAvatarChrome);
   const auto configureUserDetailLabel = [scale](Label& label) {
-    label.setShadow(Color{0.0f, 0.0f, 0.0f, 0.36f}, 0.0f, 1.0f * scale);
+    label.setShadow(colorSpecFromRole(ColorRole::Shadow, 0.36F), 0.0F, 1.0F * scale);
   };
   auto userRow = ui::row(
       {.align = FlexAlign::Center, .gap = Style::spaceMd * scale}, std::move(avatarArea),
@@ -316,18 +318,19 @@ std::unique_ptr<Flex> HomeTab::create() {
           {.out = &m_userMain,
            .align = FlexAlign::Stretch,
            .justify = FlexJustify::Center,
-           .gap = Style::spaceXs * 0.5f * scale,
+           .gap = Style::spaceXs * 0.5F * scale,
            .minHeight = avatarSize,
-           .width = 0.0f,
+           .width = 0.0F,
            .height = avatarSize,
-           .flexGrow = 1.0f},
+           .flexGrow = 1.0F},
           ui::label({
               .text = displayName,
-              .fontSize = Style::fontSizeTitle * 1.12f * scale,
+              .fontSize = Style::fontSizeTitle * 1.12F * scale,
               .fontWeight = FontWeight::Bold,
               .color = colorSpecFromRole(ColorRole::OnSurface),
-              .configure =
-                  [scale](Label& label) { label.setShadow(Color{0.0f, 0.0f, 0.0f, 0.42f}, 0.0f, 1.0f * scale); },
+              .configure = [scale](
+                               Label& label
+                           ) { label.setShadow(colorSpecFromRole(ColorRole::Shadow, 0.42F), 0.0F, 1.0F * scale); },
           }),
           ui::label({
               .out = &m_userHost,
@@ -372,7 +375,7 @@ std::unique_ptr<Flex> HomeTab::create() {
   auto leftColumn = ui::column({
       .align = FlexAlign::Stretch,
       .justify = FlexJustify::Start,
-      .gap = Style::spaceSm * scale,
+      .gap = Style::spaceMd * scale,
       .fillWidth = true,
       .flexGrow = kHomeMainColumnFlexGrow,
   });
@@ -388,7 +391,7 @@ std::unique_ptr<Flex> HomeTab::create() {
       .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applyHomeCardStyle(card, scale, opacity); },
   });
 
-  const float artSize = Style::controlHeightLg * 1.22f * scale;
+  const float artSize = Style::controlHeightLg * 1.22F * scale;
   auto mediaContent = ui::row(
       {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
       ui::column(
@@ -400,7 +403,7 @@ std::unique_ptr<Flex> HomeTab::create() {
           ui::glyph({
               .out = &m_mediaArtFallback,
               .glyph = "disc-filled",
-              .glyphSize = artSize * 0.55f,
+              .glyphSize = artSize * 0.55F,
               .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
           }),
           ui::image({
@@ -414,11 +417,11 @@ std::unique_ptr<Flex> HomeTab::create() {
           })
       ),
       ui::column(
-          {.out = &m_mediaText, .align = FlexAlign::Stretch, .gap = Style::spaceXs * 0.5f * scale, .flexGrow = 1.0f},
+          {.out = &m_mediaText, .align = FlexAlign::Stretch, .gap = Style::spaceXs * 0.5F * scale, .flexGrow = 1.0F},
           ui::label({
               .out = &m_mediaTrack,
               .text = "...",
-              .fontSize = Style::fontSizeBody * 0.95f * scale,
+              .fontSize = Style::fontSizeBody * 0.95F * scale,
               .color = colorSpecFromRole(ColorRole::OnSurface),
           }),
           ui::label({
@@ -467,16 +470,16 @@ std::unique_ptr<Flex> HomeTab::create() {
       ui::label({
           .out = &m_timeLabel,
           .text = formatShellTime(m_config),
-          .fontSize = Style::fontSizeTitle * 1.7f * scale,
+          .fontSize = Style::fontSizeTitle * 1.7F * scale,
           .fontWeight = FontWeight::Bold,
           .color = colorSpecFromRole(ColorRole::Primary),
       }),
       ui::column(
-          {.align = FlexAlign::Start, .justify = FlexJustify::Center, .gap = Style::spaceXs * 0.5f * scale},
+          {.align = FlexAlign::Start, .justify = FlexJustify::Center, .gap = Style::spaceXs * 0.5F * scale},
           ui::label({
               .out = &m_dateLabel,
               .text = formatShellDate(m_config),
-              .fontSize = Style::fontSizeBody * 0.9f * scale,
+              .fontSize = Style::fontSizeBody * 0.9F * scale,
               .color = colorSpecFromRole(ColorRole::OnSurface),
           }),
           ui::row(
@@ -484,7 +487,7 @@ std::unique_ptr<Flex> HomeTab::create() {
               ui::glyph({
                   .out = &m_weatherGlyph,
                   .glyph = "weather-cloud-sun",
-                  .glyphSize = Style::fontSizeCaption * 1.12f * scale,
+                  .glyphSize = Style::fontSizeCaption * 1.12F * scale,
                   .color = colorSpecFromRole(ColorRole::Primary),
               }),
               ui::label({
@@ -511,34 +514,76 @@ std::unique_ptr<Flex> HomeTab::create() {
 
   auto grid = std::make_unique<GridView>();
   grid->setColumns(kHomeShortcutGridColumns);
-  grid->setColumnGap(Style::spaceSm * scale);
-  grid->setRowGap(Style::spaceSm * scale);
-  grid->setPadding(0.0f);
+  grid->setColumnGap(Style::spaceMd * scale);
+  grid->setRowGap(Style::spaceMd * scale);
+  grid->setPadding(0.0F);
   grid->setUniformCellSize(true);
   grid->setStretchItems(true);
   grid->setSquareCells(false);
-  grid->setMinCellHeight(0.0f);
+  grid->setMinCellHeight(0.0F);
+  grid->setSpanLastItem(true);
   grid->setFlexGrow(kHomeShortcutsFlexGrow);
   m_shortcutsGrid = grid.get();
+
+  // Keep Shortcut instances across open/close so plugin file watches and runtimes
+  // are not recreated on every Control Center open. Match by id/type from config.
+  std::vector<std::unique_ptr<Shortcut>> previous;
+  previous.reserve(m_shortcutPads.size());
+  for (auto& pad : m_shortcutPads) {
+    previous.push_back(std::move(pad.shortcut));
+  }
   m_shortcutPads.clear();
+
+  auto takeReusable = [&previous](std::string_view type) -> std::unique_ptr<Shortcut> {
+    for (auto it = previous.begin(); it != previous.end(); ++it) {
+      if (*it != nullptr && (*it)->id() == type) {
+        auto found = std::move(*it);
+        previous.erase(it);
+        return found;
+      }
+    }
+    return nullptr;
+  };
+
+  // A plugin shortcut seeds its Luau runtime once, at construction. Plugin settings changed
+  // since the last build means every reusable plugin instance is stale, so drop it and let
+  // ShortcutRegistry::create() re-seed from the current config.
+  const bool pluginsChanged = m_config != nullptr && !(m_config->config().plugins == m_lastPlugins);
+  if (m_config != nullptr) {
+    m_lastPlugins = m_config->config().plugins;
+  }
 
   for (std::size_t i = 0; i < count; ++i) {
     const auto& sc = shortcuts[i];
-    auto shortcut = ShortcutRegistry::create(sc.type, m_services);
+    auto shortcut = takeReusable(sc.type);
+    if (shortcut != nullptr
+        && pluginsChanged
+        && scripting::isPluginEntryOfKind(sc.type, scripting::PluginEntryKind::Shortcut)) {
+      shortcut.reset();
+    }
+    const bool reused = shortcut != nullptr;
+    if (!reused) {
+      shortcut = ShortcutRegistry::create(sc.type, m_services);
+    }
     if (shortcut == nullptr) {
       continue;
     }
+    if (reused) {
+      shortcut->onPanelOpen();
+    }
 
+    const bool showLabels = m_config != nullptr ? m_config->config().controlCenter.showShortcutLabels : true;
     const std::string label = shortcut->displayLabel();
     const bool enabled = shortcut->enabled();
     const bool isActive = shortcut->isToggle() && shortcut->active();
 
     const std::size_t padIdx = m_shortcutPads.size();
     auto btn = ui::button({
-        .text = label,
+        .text = showLabels ? std::optional<std::string>{label} : std::nullopt,
         .glyph = shortcut->displayIcon(),
-        .glyphSize = Style::fontSizeTitle * 1.35f * scale,
-        .minHeight = 0.0f,
+        .glyphSize = Style::fontSizeTitle * 1.35F * scale,
+        .contentAlign = showLabels ? ButtonContentAlign::Start : ButtonContentAlign::Center,
+        .minHeight = 0.0F,
         .padding = Style::spaceSm * scale,
         .gap = Style::spaceXs * scale,
         .radius = Style::scaledRadiusXl(scale),
@@ -555,16 +600,21 @@ std::unique_ptr<Flex> HomeTab::create() {
               }
             },
         .configure =
-            [enabled, isActive, fillOpacity = panelCardOpacity(), scale](Button& button) {
-              // Match media card column: Stretch so label width follows the cell; Center uses intrinsic text width and
-              // fights setMaxWidth.
-              button.setAlign(FlexAlign::Stretch);
-              // Label font only: Button::setFontSize also resizes the glyph. Mini + uiScale keeps tiles closer to
-              // other CC rows that use raw fontSizeCaption, while still scaling with shell.uiScale for consistency.
-              button.label()->setFontSize(Style::fontSizeMini * scale);
-              button.label()->setMaxLines(1);
-              button.label()->setTextAlign(TextAlign::Center);
+            [enabled, isActive, showLabels, fillOpacity = panelCardOpacity(), scale](Button& button) {
               button.setDirection(FlexDirection::Vertical);
+              button.setJustify(FlexJustify::Center);
+              if (showLabels) {
+                // Stretch so the label width follows the cell; Center uses intrinsic text
+                // width and fights setMaxWidth.
+                button.setAlign(FlexAlign::Stretch);
+                if (button.label() != nullptr) {
+                  button.label()->setFontSize(Style::fontSizeMini * scale);
+                  button.label()->setMaxLines(1);
+                  button.label()->setTextAlign(TextAlign::Center);
+                }
+              } else {
+                button.setAlign(FlexAlign::Center);
+              }
               applyShortcutButtonStyle(button, enabled, isActive, fillOpacity);
             },
     });
@@ -576,11 +626,11 @@ std::unique_ptr<Flex> HomeTab::create() {
           return false;
         }
         const float steps = data.scrollSteps();
-        if (steps == 0.0f) {
+        if (steps == 0.0F) {
           return false;
         }
         // Scroll up moves forward (toward performance); Wayland reports up as a negative delta.
-        m_shortcutPads[padIdx].shortcut->onScroll(steps > 0.0f ? -1 : 1);
+        m_shortcutPads[padIdx].shortcut->onScroll(steps > 0.0F ? -1 : 1);
         return true;
       });
     }
@@ -595,7 +645,7 @@ std::unique_ptr<Flex> HomeTab::create() {
 
   if (m_shortcutPads.size() <= kHomeStackedShortcutMax) {
     grid->setColumns(1);
-    grid->setFlexGrow(0.0f);
+    grid->setFlexGrow(0.0F);
   }
 
   if (!m_shortcutPads.empty()) {
@@ -610,7 +660,7 @@ std::unique_ptr<Flex> HomeTab::create() {
 
 std::unique_ptr<Flex> HomeTab::createHeaderActions() {
   const float scale = contentScale();
-  return ui::row(
+  auto row = ui::row(
       {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
       ui::button({
           .out = &m_settingsButton,
@@ -625,30 +675,31 @@ std::unique_ptr<Flex> HomeTab::createHeaderActions() {
           .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
       })
   );
+  syncHeaderActions();
+  return row;
 }
 
 void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
-  (void)bodyHeight;
   if (m_rootLayout == nullptr) {
     return;
   }
 
   if (m_mediaCard != nullptr) {
-    m_mediaCard->setMinHeight(0.0f);
-    m_mediaCard->setMaxHeight(0.0f);
+    m_mediaCard->setMinHeight(0.0F);
+    m_mediaCard->setMaxHeight(0.0F);
   }
   if (m_dateTimeCard != nullptr) {
-    m_dateTimeCard->setMinHeight(0.0f);
-    m_dateTimeCard->setMaxHeight(0.0f);
+    m_dateTimeCard->setMinHeight(0.0F);
+    m_dateTimeCard->setMaxHeight(0.0F);
   }
   if (m_userAvatar != nullptr && m_userMain != nullptr) {
-    const float userMainHeight = std::max(1.0f, m_userAvatar->height());
+    const float userMainHeight = std::max(1.0F, m_userAvatar->height());
     m_userMain->setMinHeight(userMainHeight);
     m_userMain->setSize(m_userMain->width(), userMainHeight);
   }
   if (m_shortcutsGrid != nullptr && !m_shortcutPads.empty()) {
     const float scale = contentScale();
-    const float bottomRowGap = m_bottomRow != nullptr ? m_bottomRow->gap() : 0.0f;
+    const float bottomRowGap = m_bottomRow != nullptr ? m_bottomRow->gap() : 0.0F;
     const bool stacked = m_shortcutPads.size() <= kHomeStackedShortcutMax;
     const std::size_t cols = stacked ? 1U : kHomeShortcutGridColumns;
     const std::size_t rows = (m_shortcutPads.size() + cols - 1) / cols;
@@ -664,11 +715,11 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
     // user card (which content-overflows). Reserve the user card's natural height and cap the
     // square side to fit; cap the grid width to keep tiles square, handing the freed width to
     // the media/clock column.
-    const float userCardReserve = homeAvatarSize(scale) + 2.0f * (Style::spaceSm + Style::spaceXs) * scale;
+    const float userCardReserve = homeAvatarSize(scale) + 2.0F * (Style::spaceSm + Style::spaceXs) * scale;
     const float rootGap = m_rootLayout->gap();
-    const float availForGrid = std::max(1.0f, bodyHeight - userCardReserve - rootGap);
+    const float availForGrid = std::max(1.0F, bodyHeight - userCardReserve - rootGap);
     const float maxCellSide =
-        std::max(1.0f, (availForGrid - static_cast<float>(rows - 1) * rowGap - padV) / static_cast<float>(rows));
+        std::max(1.0F, (availForGrid - static_cast<float>(rows - 1) * rowGap - padV) / static_cast<float>(rows));
     const float maxGridWidth = static_cast<float>(cols) * (maxCellSide / kHomeShortcutSquareTrim)
         + static_cast<float>(cols - 1) * colGap
         + padH;
@@ -680,7 +731,7 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
     // Pin the width (flexGrow 0) for the stacked column or whenever capped, so the left column
     // absorbs the slack; otherwise let the 2-column grid flex-grow normally.
     if (stacked || capped) {
-      m_shortcutsGrid->setFlexGrow(0.0f);
+      m_shortcutsGrid->setFlexGrow(0.0F);
       m_shortcutsGrid->setSize(gridWidth, m_shortcutsGrid->height());
     } else {
       m_shortcutsGrid->setFlexGrow(kHomeShortcutsFlexGrow);
@@ -696,17 +747,17 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
       if (pad.label == nullptr) {
         continue;
       }
-      float inner = 1.0f;
-      if (pad.button != nullptr && pad.button->width() > 1.0f) {
-        inner = std::max(1.0f, pad.button->width() - pad.button->paddingLeft() - pad.button->paddingRight());
+      float inner = 1.0F;
+      if (pad.button != nullptr && pad.button->width() > 1.0F) {
+        inner = std::max(1.0F, pad.button->width() - pad.button->paddingLeft() - pad.button->paddingRight());
       } else {
         const float gridW = m_shortcutsGrid->width();
         const float innerGrid =
-            std::max(1.0f, gridW - m_shortcutsGrid->paddingLeft() - m_shortcutsGrid->paddingRight());
+            std::max(1.0F, gridW - m_shortcutsGrid->paddingLeft() - m_shortcutsGrid->paddingRight());
         const std::size_t cols = std::max<std::size_t>(1, std::min(m_shortcutsGrid->columns(), m_shortcutPads.size()));
         const float cellWidth =
             (innerGrid - static_cast<float>(cols - 1) * m_shortcutsGrid->columnGap()) / static_cast<float>(cols);
-        inner = std::max(1.0f, cellWidth - 2.0f * Style::spaceSm * scale);
+        inner = std::max(1.0F, cellWidth - 2.0F * Style::spaceSm * scale);
       }
       pad.label->setMaxWidth(inner);
     }
@@ -714,9 +765,9 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
 
   const auto innerWidth = [](Flex* card) {
     if (card == nullptr) {
-      return 1.0f;
+      return 1.0F;
     }
-    return std::max(1.0f, card->width() - (card->paddingLeft() + card->paddingRight()));
+    return std::max(1.0F, card->width() - (card->paddingLeft() + card->paddingRight()));
   };
   const float dateTimeWrap = innerWidth(m_dateTimeCard);
   if (m_timeLabel != nullptr) {
@@ -726,7 +777,7 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
 
   float dateTimeRightWrap = dateTimeWrap;
   if (m_timeLabel != nullptr && m_dateTimeCard != nullptr) {
-    dateTimeRightWrap = std::max(1.0f, dateTimeWrap - m_timeLabel->width() - m_dateTimeCard->gap());
+    dateTimeRightWrap = std::max(1.0F, dateTimeWrap - m_timeLabel->width() - m_dateTimeCard->gap());
   }
   if (m_dateLabel != nullptr) {
     m_dateLabel->setMaxWidth(dateTimeRightWrap);
@@ -734,9 +785,9 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
   }
   if (m_weatherLine != nullptr) {
     const float weatherTextWrap = std::max(
-        1.0f,
+        1.0F,
         dateTimeRightWrap
-            - (m_weatherGlyph != nullptr ? m_weatherGlyph->width() : 0.0f)
+            - (m_weatherGlyph != nullptr ? m_weatherGlyph->width() : 0.0F)
             - Style::spaceXs * contentScale()
     );
     m_weatherLine->setMaxWidth(weatherTextWrap);
@@ -771,10 +822,10 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
     const float scale = contentScale();
     const float minAvatar = homeAvatarSize(scale);
     const float desiredAvatar = std::max(minAvatar, m_userMain->height());
-    if (std::abs(m_userAvatar->width() - desiredAvatar) > 0.5f) {
+    if (std::abs(m_userAvatar->width() - desiredAvatar) > 0.5F) {
       m_userAvatar->setSize(desiredAvatar, desiredAvatar);
-      m_userAvatar->setRadius(desiredAvatar * 0.5f);
-      m_userAvatar->setPadding(1.0f * scale);
+      m_userAvatar->setRadius(desiredAvatar * 0.5F);
+      m_userAvatar->setPadding(1.0F * scale);
     }
     m_userMain->setMinHeight(desiredAvatar);
     m_userMain->setSize(m_userMain->width(), desiredAvatar);
@@ -783,38 +834,52 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
   // Lock the shortcuts grid height to its square-cell natural size so it does not vary
   // when the media or clock cards change. The leftColumn stretches to match this height.
   if (m_shortcutsGrid != nullptr && !m_shortcutPads.empty()) {
+    const float scale = contentScale();
     const float gridW = m_shortcutsGrid->width();
-    const float innerGridW = std::max(1.0f, gridW - m_shortcutsGrid->paddingLeft() - m_shortcutsGrid->paddingRight());
+    const float innerGridW = std::max(1.0F, gridW - m_shortcutsGrid->paddingLeft() - m_shortcutsGrid->paddingRight());
     const std::size_t cols = std::max<std::size_t>(1, std::min(m_shortcutsGrid->columns(), m_shortcutPads.size()));
     const std::size_t rows = (m_shortcutPads.size() + cols - 1) / cols;
     const float cellWidth = std::max(
-        1.0f, (innerGridW - static_cast<float>(cols - 1) * m_shortcutsGrid->columnGap()) / static_cast<float>(cols)
+        1.0F, (innerGridW - static_cast<float>(cols - 1) * m_shortcutsGrid->columnGap()) / static_cast<float>(cols)
     );
     // Cells aim for square but trimmed slightly so the grid stays compact and the bottom row
     // doesn't tower over the user card area. The width was capped earlier so this stays bounded.
     const float cellSide = cellWidth * kHomeShortcutSquareTrim;
-    const float measuredRowH = m_bottomRow != nullptr ? m_bottomRow->height() : m_shortcutsGrid->height();
-    const float formulaH = static_cast<float>(rows) * cellSide
+    const bool showLabels = m_config != nullptr ? m_config->config().controlCenter.showShortcutLabels : true;
+    for (auto& pad : m_shortcutPads) {
+      if (pad.glyph == nullptr) {
+        continue;
+      }
+      if (showLabels) {
+        pad.glyph->setGlyphSize(Style::fontSizeTitle * 1.35F * scale);
+      } else {
+        const float dynamicGlyphSize = std::clamp(cellSide * 0.28F, 22.0F * scale, 44.0F * scale);
+        pad.glyph->setGlyphSize(dynamicGlyphSize);
+      }
+    }
+
+    const float gridH = std::round(
+        static_cast<float>(rows) * cellSide
         + static_cast<float>(rows > 0 ? rows - 1 : 0) * m_shortcutsGrid->rowGap()
         + m_shortcutsGrid->paddingTop()
-        + m_shortcutsGrid->paddingBottom();
-    const float gridH = std::round(std::max(measuredRowH, formulaH));
+        + m_shortcutsGrid->paddingBottom()
+    );
     if (m_bottomRow != nullptr) {
       m_bottomRow->setMinHeight(gridH);
     }
 
     // Integer card heights track the snapped row height so top/bottom borders land on pixels.
     if (m_mediaCard != nullptr && m_dateTimeCard != nullptr) {
-      const float colGap = Style::spaceSm * contentScale();
-      const float avail = std::max(0.0f, gridH - colGap);
+      const float colGap = Style::spaceMd * contentScale();
+      const float avail = std::max(0.0F, gridH - colGap);
       const float cardGrowTotal = kHomeMediaCardFlexGrow + kHomeDateTimeCardFlexGrow;
       const float mediaH = std::round(avail * (kHomeMediaCardFlexGrow / cardGrowTotal));
-      const float dateH = std::max(0.0f, avail - mediaH);
+      const float dateH = std::max(0.0F, avail - mediaH);
 
       m_mediaCard->setMinHeight(mediaH);
-      m_mediaCard->setMaxHeight(mediaH);
+      m_mediaCard->setMaxHeight(0.0F);
       m_dateTimeCard->setMinHeight(dateH);
-      m_dateTimeCard->setMaxHeight(dateH);
+      m_dateTimeCard->setMaxHeight(0.0F);
     }
   }
 
@@ -842,7 +907,7 @@ InputArea* HomeTab::addCardOverlay(Flex& card, std::function<void()> onActivate)
 }
 
 InputArea* HomeTab::addCardOverlay(Flex& card, std::function<void()> onActivate, CardOverlayOptions options) {
-  auto area = std::make_unique<InputArea>();
+  auto area = ui::inputArea({});
   area->setParticipatesInLayout(false);
   area->setZIndex(3);
   area->setCursorShape(WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER);
@@ -898,7 +963,7 @@ void HomeTab::layoutCardOverlays() {
     if (card == nullptr || area == nullptr) {
       return;
     }
-    area->setPosition(0.0f, 0.0f);
+    area->setPosition(0.0F, 0.0F);
     area->setSize(card->width(), card->height());
   };
   cover(m_mediaCard, m_mediaCardArea);
@@ -908,15 +973,15 @@ void HomeTab::layoutCardOverlays() {
   // The pointer overlay must not swallow the avatar's own click, so start it just past the
   // avatar's right edge; the avatar (a nested InputArea) keeps the carved-out left region.
   if (m_userCard != nullptr && m_userCardArea != nullptr) {
-    float left = 0.0f;
+    float left = 0.0F;
     if (m_userAvatar != nullptr) {
-      float ax = 0.0f, ay = 0.0f, cx = 0.0f, cy = 0.0f;
+      float ax = 0.0F, ay = 0.0F, cx = 0.0F, cy = 0.0F;
       Node::absolutePosition(m_userAvatar, ax, ay);
       Node::absolutePosition(m_userCard, cx, cy);
-      left = std::max(0.0f, (ax - cx) + m_userAvatar->width() + Style::spaceMd * contentScale());
+      left = std::max(0.0F, (ax - cx) + m_userAvatar->width() + Style::spaceMd * contentScale());
     }
-    m_userCardArea->setPosition(left, 0.0f);
-    m_userCardArea->setSize(std::max(0.0f, m_userCard->width() - left), m_userCard->height());
+    m_userCardArea->setPosition(left, 0.0F);
+    m_userCardArea->setSize(std::max(0.0F, m_userCard->width() - left), m_userCard->height());
   }
 }
 
@@ -926,12 +991,12 @@ bool HomeTab::resizeMediaArtToCard() {
   }
 
   const float scale = contentScale();
-  const float minArt = Style::controlHeightLg * 1.22f * scale;
-  const float maxArt = Style::controlHeightLg * 2.6f * scale;
+  const float minArt = Style::controlHeightLg * 1.22F * scale;
+  const float maxArt = Style::controlHeightLg * 2.6F * scale;
   const float available =
-      std::max(0.0f, m_mediaCard->height() - m_mediaCard->paddingTop() - m_mediaCard->paddingBottom());
+      std::max(0.0F, m_mediaCard->height() - m_mediaCard->paddingTop() - m_mediaCard->paddingBottom());
   const float desired = std::clamp(available, minArt, maxArt);
-  if (std::abs(m_mediaArtSlot->width() - desired) <= 0.5f) {
+  if (std::abs(m_mediaArtSlot->width() - desired) <= 0.5F) {
     return false;
   }
 
@@ -939,7 +1004,7 @@ bool HomeTab::resizeMediaArtToCard() {
   m_mediaArt->setSize(desired, desired);
   m_mediaArt->setRadius(Style::scaledRadiusLg(scale));
   if (m_mediaArtFallback != nullptr) {
-    m_mediaArtFallback->setGlyphSize(desired * 0.55f);
+    m_mediaArtFallback->setGlyphSize(desired * 0.55F);
   }
   return true;
 }
@@ -952,18 +1017,18 @@ void HomeTab::layoutWallpaperBackground(Renderer& renderer) {
   // The wallpaper sits one border width inside the card so a hover or focus stroke has a gap of
   // its own to fill; the card fill is cleared behind it, so that gap reads as panel background.
   const float bw = Style::borderWidth;
-  const float cw = std::max(0.0f, m_userCard->width() - bw * 2.0f);
-  const float ch = std::max(0.0f, m_userCard->height() - bw * 2.0f);
-  const float radius = std::max(0.0f, Style::scaledRadiusXl(contentScale()) - bw);
+  const float cw = std::max(0.0F, m_userCard->width() - bw * 2.0F);
+  const float ch = std::max(0.0F, m_userCard->height() - bw * 2.0F);
+  const float radius = std::max(0.0F, Style::scaledRadiusXl(contentScale()) - bw);
 
   const Color surface = colorForRole(ColorRole::Surface);
-  const Color translucentSurface = rgba(surface.r, surface.g, surface.b, surface.a * 0.9f);
-  const Color transparentSurface = rgba(surface.r, surface.g, surface.b, 0.0f);
+  const Color translucentSurface = rgba(surface.r, surface.g, surface.b, surface.a * 0.9F);
+  const Color transparentSurface = rgba(surface.r, surface.g, surface.b, 0.0F);
   const ImageScrim scrim{
       .direction = GradientDirection::Horizontal,
       .stops =
-          {GradientStop{0.0f, translucentSurface}, GradientStop{0.25f, translucentSurface},
-           GradientStop{0.9f, transparentSurface}, GradientStop{1.0f, transparentSurface}},
+          {GradientStop{0.0F, translucentSurface}, GradientStop{0.25F, translucentSurface},
+           GradientStop{0.9F, transparentSurface}, GradientStop{1.0F, transparentSurface}},
       .enabled = true,
   };
 
@@ -1024,7 +1089,7 @@ void HomeTab::syncWallpaperBackground(Renderer& renderer) {
   }
 
   const std::string path = m_wallpaper != nullptr ? m_wallpaper->currentPath() : std::string{};
-  const float renderScale = std::max(1.0f, renderer.renderScale());
+  const float renderScale = std::max(1.0F, renderer.renderScale());
   const int targetPx =
       static_cast<int>(std::lround(std::max(m_wallpaperBg->width(), m_wallpaperBg->height()) * renderScale));
 
@@ -1035,7 +1100,7 @@ void HomeTab::syncWallpaperBackground(Renderer& renderer) {
     m_crispOpaque = false;
     m_wallpaperBg->setVisible(false);
     cancelCrispFade();
-    m_wallpaperBg->setOpacity(0.0f);
+    m_wallpaperBg->setOpacity(0.0F);
     m_crispWorkingPath.clear();
     m_crispWorkingSize = 0;
     m_crispShown = false;
@@ -1061,7 +1126,7 @@ void HomeTab::syncWallpaperBackground(Renderer& renderer) {
     m_crispNeedsFade = false;
     m_crispOpaque = false;
     cancelCrispFade();
-    m_wallpaperBg->setOpacity(0.0f);
+    m_wallpaperBg->setOpacity(0.0F);
     m_wallpaperBg->setVisible(false);
   }
 
@@ -1087,7 +1152,7 @@ void HomeTab::syncWallpaperBackground(Renderer& renderer) {
   } else {
     // Ready on the first look (cached) — snap in without a crossfade.
     cancelCrispFade();
-    m_wallpaperBg->setOpacity(1.0f);
+    m_wallpaperBg->setOpacity(1.0F);
     m_crispOpaque = true;
   }
   syncWallpaperLayerVisibility();
@@ -1099,7 +1164,7 @@ void HomeTab::startCrispFade() {
   }
   AnimationManager* animations = m_wallpaperBg->animationManager();
   if (animations == nullptr) {
-    m_wallpaperBg->setOpacity(1.0f);
+    m_wallpaperBg->setOpacity(1.0F);
     m_crispOpaque = true;
     syncWallpaperLayerVisibility();
     return;
@@ -1107,7 +1172,7 @@ void HomeTab::startCrispFade() {
   cancelCrispFade();
   Image* crisp = m_wallpaperBg;
   m_wallpaperCrispAnimId = animations->animate(
-      0.0f, 1.0f, static_cast<float>(Style::animNormal), Easing::EaseOutCubic,
+      0.0F, 1.0F, static_cast<float>(Style::animNormal), Easing::EaseOutCubic,
       [crisp](float v) { crisp->setOpacity(v); },
       [this]() {
         m_wallpaperCrispAnimId = 0;
@@ -1128,7 +1193,14 @@ void HomeTab::cancelCrispFade() {
   m_wallpaperCrispAnimId = 0;
 }
 
+void HomeTab::syncHeaderActions() {
+  if (m_sessionButton != nullptr) {
+    m_sessionButton->setVisible(m_config == nullptr || m_config->config().controlCenter.showSessionButton);
+  }
+}
+
 void HomeTab::doUpdate(Renderer& renderer) {
+  syncHeaderActions();
   if (!m_active) {
     m_progressTimer.stop();
     return;
@@ -1233,7 +1305,15 @@ void HomeTab::onClose() {
   m_nextRealtimeUpdateAt = {};
   m_lastRealtimeMprisPollAt = {};
   m_shortcutsGrid = nullptr;
-  m_shortcutPads.clear();
+  // Keep Shortcut instances alive; drop only the UI pointers destroyed with the scene.
+  for (auto& pad : m_shortcutPads) {
+    if (pad.shortcut != nullptr) {
+      pad.shortcut->onPanelClose();
+    }
+    pad.button = nullptr;
+    pad.glyph = nullptr;
+    pad.label = nullptr;
+  }
 }
 
 void HomeTab::onPanelCardOpacityChanged(float opacity) {
@@ -1244,13 +1324,13 @@ void HomeTab::onPanelCardOpacityChanged(float opacity) {
 void HomeTab::syncScaledFonts() {
   const float s = contentScale();
   if (m_timeLabel != nullptr) {
-    m_timeLabel->setFontSize(Style::fontSizeTitle * 1.7f * s);
+    m_timeLabel->setFontSize(Style::fontSizeTitle * 1.7F * s);
   }
   if (m_dateLabel != nullptr) {
-    m_dateLabel->setFontSize(Style::fontSizeBody * 0.9f * s);
+    m_dateLabel->setFontSize(Style::fontSizeBody * 0.9F * s);
   }
   if (m_weatherGlyph != nullptr) {
-    m_weatherGlyph->setGlyphSize(Style::fontSizeCaption * 1.12f * s);
+    m_weatherGlyph->setGlyphSize(Style::fontSizeCaption * 1.12F * s);
   }
   if (m_weatherLine != nullptr) {
     m_weatherLine->setFontSize(Style::fontSizeCaption * s);
@@ -1261,7 +1341,7 @@ void HomeTab::syncScaledFonts() {
     }
   }
   if (m_mediaTrack != nullptr) {
-    m_mediaTrack->setFontSize(Style::fontSizeBody * 0.95f * s);
+    m_mediaTrack->setFontSize(Style::fontSizeBody * 0.95F * s);
   }
   if (m_mediaArtist != nullptr) {
     m_mediaArtist->setFontSize(Style::fontSizeCaption * s);
@@ -1277,7 +1357,10 @@ void HomeTab::syncScaledFonts() {
       pad.label->setFontSize(Style::fontSizeMini * s);
     }
     if (pad.glyph != nullptr) {
-      pad.glyph->setGlyphSize(Style::fontSizeTitle * 1.35f * s);
+      // Icon-only glyphs are sized from cell side in doLayout.
+      if (m_config == nullptr || m_config->config().controlCenter.showShortcutLabels) {
+        pad.glyph->setGlyphSize(Style::fontSizeTitle * 1.35F * s);
+      }
     }
   }
 }
@@ -1464,7 +1547,7 @@ void HomeTab::sync(Renderer& renderer) {
             );
             bool loaded = false;
             if (!artPath.empty()) {
-              const int decodeSize = static_cast<int>(std::round(Style::controlHeightLg * 2.6f * contentScale()));
+              const int decodeSize = static_cast<int>(std::round(Style::controlHeightLg * 2.6F * contentScale()));
               loaded = m_mediaArt->setSourceFile(renderer, artPath, decodeSize, true, true);
               if (!loaded) {
                 m_mediaArt->clear(renderer);

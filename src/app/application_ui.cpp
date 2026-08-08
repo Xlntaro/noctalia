@@ -137,6 +137,7 @@ void Application::initUiRenderSurfacesAndSettings() {
   );
   m_settingsWindow.setPluginManager(&m_pluginManager);
   m_settingsWindow.setIpcService(&m_ipcService);
+  m_settingsWindow.setAsyncTextureCache(&m_asyncTextureCache);
   m_settingsWindow.setOpenDesktopWidgetEditor([this]() {
     if (m_lockscreenWidgetsController.isEditing()) {
       m_lockscreenWidgetsController.exitEdit();
@@ -168,7 +169,7 @@ void Application::initUiRenderSurfacesAndSettings() {
     m_lockscreenWidgetsController.toggleEdit();
     if (!wasEditing && m_lockscreenWidgetsController.isEditing()) {
       if (m_settingsWindow.isOpen()) {
-        m_settingsWindow.close();
+        DeferredCall::callLater([this]() { m_settingsWindow.close(); });
       }
       notify::info(
           "Noctalia", i18n::tr("notifications.internal.lockscreen-widgets-editor"),
@@ -316,6 +317,7 @@ void Application::initLockScreenAndSession() {
   m_configService.addReloadCallback([this]() {
     if (m_logindService != nullptr) {
       m_logindService->setSessionLockIntegrationEnabled(m_configService.isLockScreenEnabled());
+      m_logindService->setLockBeforeSuspendEnabled(m_configService.shouldLockBeforeSuspend());
     }
     m_lockScreen.onConfigChanged();
     m_lockscreenWidgetsController.onLockStateChanged();
@@ -325,11 +327,15 @@ void Application::initLockScreenAndSession() {
         m_idleGraceOverlay.hide();
         m_lockscreenWidgetsController.onLockStateChanged();
         m_hookManager.fire(HookKind::SessionLocked);
+        releaseSleepDelayInhibitIfPending();
       },
       [this]() {
         m_idleGraceOverlay.hide();
         m_lockscreenWidgetsController.onLockStateChanged();
         m_hookManager.fire(HookKind::SessionUnlocked);
+        // Lock aborted before engage (e.g. compositor finished the lock object) — still release
+        // so PrepareForSleep is not stuck on the delay inhibit.
+        releaseSleepDelayInhibitIfPending();
         requestAllSurfacesRedraw();
         if (m_logindService != nullptr) {
           m_logindService->syncSessionUnlocked();
@@ -338,6 +344,7 @@ void Application::initLockScreenAndSession() {
   );
   if (m_logindService != nullptr) {
     m_logindService->setSessionLockIntegrationEnabled(m_configService.isLockScreenEnabled());
+    m_logindService->setLockBeforeSuspendEnabled(m_configService.shouldLockBeforeSuspend());
     m_logindService->setLockCallback([this]() {
       if (!m_configService.isLockScreenEnabled()) {
         return;
@@ -363,6 +370,8 @@ void Application::initLockScreenAndSession() {
   sessionActionHooks.onLogout = [this]() { return m_hookManager.fireBlocking(HookKind::LoggingOut); };
   sessionActionHooks.onReboot = [this]() { return m_hookManager.fireBlocking(HookKind::Rebooting); };
   sessionActionHooks.onShutdown = [this]() { return m_hookManager.fireBlocking(HookKind::ShuttingDown); };
+  sessionActionHooks.onBeforePlainSuspend = [this]() { m_skipLockOnNextSleep = true; };
+  sessionActionHooks.onPlainSuspendAborted = [this]() { m_skipLockOnNextSleep = false; };
   m_sessionActionRunner.setHooks(std::move(sessionActionHooks));
   m_sessionActionRunner.setPowerConfig(m_configService.config().shell.session.power);
   m_configService.addReloadCallback(
@@ -394,6 +403,11 @@ void Application::initInputDispatch() {
     if (m_fileDialogPopup.onPointerEvent(event)) {
       return;
     }
+    // Region overlay is layer Overlay + exclusive keyboard; prefer it over the
+    // widgets editors (Bottom / OnDemand) so confirm/cancel still work mid-edit.
+    if (m_screenshotService.onPointerEvent(event)) {
+      return;
+    }
     if (m_lockscreenWidgetsController.onPointerEvent(event)) {
       return;
     }
@@ -401,9 +415,6 @@ void Application::initInputDispatch() {
       return;
     }
     if (m_wallpaper.onPointerEvent(event)) {
-      return;
-    }
-    if (m_screenshotService.onPointerEvent(event)) {
       return;
     }
     if (m_trayMenu.onPointerEvent(event)) {
@@ -452,6 +463,9 @@ void Application::initInputDispatch() {
       m_fileDialogPopup.onKeyboardEvent(event);
       return;
     }
+    if (m_screenshotService.onKeyboardEvent(event)) {
+      return;
+    }
     if (m_lockscreenWidgetsController.isEditing()) {
       m_lockscreenWidgetsController.onKeyboardEvent(event);
       return;
@@ -462,9 +476,6 @@ void Application::initInputDispatch() {
     }
     if (m_settingsWindow.ownsKeyboardSurface(m_wayland.lastKeyboardSurface())) {
       m_settingsWindow.onKeyboardEvent(event);
-      return;
-    }
-    if (m_screenshotService.onKeyboardEvent(event)) {
       return;
     }
     if (m_overviewLauncherCapture.handleKeyboardEvent(event)) {
@@ -504,7 +515,10 @@ void Application::initPanelManagerAndPanels() {
     m_panelManager.openPanel("wallpaper", PanelOpenRequest{.output = output});
   });
   m_settingsWindow.setCalendarService(&m_calendarService);
-  m_calendarService.setCredentialChangeCallback([this]() { m_settingsWindow.onExternalOptionsChanged(); });
+  m_calendarService.setCredentialChangeCallback([this]() {
+    m_settingsWindow.onExternalOptionsChanged();
+    retrySecretServiceConsumers();
+  });
   m_settingsWindow.setClipboardService(&m_clipboardService);
   m_clipboardService.setPersistenceChangeCallback([this]() { m_settingsWindow.onExternalOptionsChanged(); });
   m_settingsWindow.setResetEncryptedStorage([this]() {
@@ -676,14 +690,7 @@ void Application::initPanelManagerAndPanels() {
           &m_wayland, &m_configService, &m_thumbnailService, &m_wallpaperScanner, &m_themeService
       )
   );
-  std::size_t trayDrawerColumns = 3;
-  if (const auto it = m_configService.config().widgets.find("tray"); it != m_configService.config().widgets.end()) {
-    trayDrawerColumns =
-        static_cast<std::size_t>(std::clamp<std::int64_t>(it->second.getInt("drawer_columns", 3), 1, 5));
-  }
-  m_panelManager.registerPanel(
-      "tray-drawer", std::make_unique<TrayDrawerPanel>(m_trayService.get(), &m_configService, trayDrawerColumns)
-  );
+  m_panelManager.registerPanel("tray-drawer", std::make_unique<TrayDrawerPanel>(m_trayService.get(), &m_configService));
   m_panelManager.registerPanel("polkit", std::make_unique<PolkitPanel>(&m_configService, [this]() {
                                  return m_polkitAgent.get();
                                }));
@@ -700,6 +707,11 @@ void Application::initNotificationAndOsd() {
   auto applyNotificationFilterConfig = [this]() {
     m_notificationManager.setFilters(m_configService.config().notification.filters);
   };
+  auto applyHistoryRetention = [this]() {
+    m_notificationManager.setHistoryRetentionHours(m_configService.config().notification.historyRetentionHours);
+  };
+  applyHistoryRetention();
+  m_configService.addReloadCallback(applyHistoryRetention);
   applyNotificationFilterConfig();
   m_configService.addReloadCallback(applyNotificationFilterConfig);
   m_configService.setNotificationManager(&m_notificationManager);
@@ -803,6 +815,7 @@ void Application::initNotificationAndOsd() {
 
 void Application::initBarDockAndLayout() {
   m_trayMenu.initialize(m_wayland, &m_configService, m_trayService.get(), &m_renderContext);
+  m_trayMenu.setClosedCallback([this]() { m_bar.reevaluateAutoHideAfterPopup(); });
 
   m_bar.initialize({
       .platform = m_compositorPlatform,
@@ -835,6 +848,9 @@ void Application::initBarDockAndLayout() {
   m_idleInhibitor.setAnchorSurfacesProvider([this]() { return m_bar.caffeineAnchorSurfaces(); });
   m_panelManager.setOpenWidgetSettingsCallback([this](std::string barName, std::string widgetName) {
     m_settingsWindow.openToBarWidget(std::move(barName), std::move(widgetName));
+  });
+  m_panelManager.setOpenPluginSettingsCallback([this](std::string pluginId) {
+    return m_settingsWindow.openToPlugin(std::move(pluginId));
   });
   m_panelManager.setAttachedPanelGeometryCallback(
       [this](wl_output* output, std::string_view barName, std::optional<AttachedPanelGeometry> geometry) {
@@ -963,7 +979,7 @@ void Application::initWidgetControllersAndCallbacks() {
   });
   m_desktopWidgetsController.setOnEnterEditCallback([this]() {
     if (m_settingsWindow.isOpen()) {
-      m_settingsWindow.close();
+      DeferredCall::callLater([this]() { m_settingsWindow.close(); });
     }
   });
   m_iconThemePollSource.setChangeCallback([this]() { onIconThemeChanged(); });
@@ -993,6 +1009,7 @@ void Application::initWidgetControllersAndCallbacks() {
         m_colorPickerDialogPopup.requestLayout();
         m_glyphPickerDialogPopup.requestLayout();
         m_fileDialogPopup.requestLayout();
+        scheduleGreeterAutoSync();
       },
       "shell-font-family"
   );

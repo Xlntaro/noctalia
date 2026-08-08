@@ -8,6 +8,7 @@
 #include "scripting/plugin_id.h"
 #include "scripting/plugin_panel_shell.h"
 #include "scripting/plugin_registry.h"
+#include "shell/settings/settings_content_common.h"
 #include "shell/settings/settings_control_factory.h"
 #include "shell/settings/settings_registry.h"
 #include "shell/settings/widget_settings_registry.h"
@@ -68,8 +69,8 @@ namespace settings {
           .padding = Style::spaceSm * scale,
           .configure = [scale](Flex& p) {
             p.setRadius(Style::scaledRadiusSm(scale));
-            p.setFill(colorSpecFromRole(ColorRole::Error, 0.10f));
-            p.setBorder(colorSpecFromRole(ColorRole::Error, 0.5f), Style::borderWidth);
+            p.setFill(colorSpecFromRole(ColorRole::Error, 0.10F));
+            p.setBorder(colorSpecFromRole(ColorRole::Error, 0.5F), Style::borderWidth);
           },
       });
       panel->addChild(makeLabel(
@@ -147,7 +148,7 @@ namespace settings {
       auto row = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true});
       Flex* r = row.get();
 
-      auto info = ui::column({.align = FlexAlign::Start, .gap = 2.0f * scale, .flexGrow = 1.0f});
+      auto info = ui::column({.align = FlexAlign::Start, .gap = 2.0F * scale, .flexGrow = 1.0F});
       info->addChild(makeLabel(
           pluginSourceDisplayName(source.name), Style::fontSizeBody * scale,
           source.enabled ? ColorRole::OnSurface : ColorRole::OnSurfaceVariant, FontWeight::Medium
@@ -201,7 +202,7 @@ namespace settings {
       return row;
     }
 
-    std::unique_ptr<Flex> makeRoleBadge(std::string_view label, ColorRole role, float scale, float fillAlpha = 0.15f) {
+    std::unique_ptr<Flex> makeRoleBadge(std::string_view label, ColorRole role, float scale, float fillAlpha = 0.15F) {
       return ui::row(
           {.align = FlexAlign::Center,
            .paddingH = Style::spaceXs * scale,
@@ -232,7 +233,7 @@ namespace settings {
           })
       );
 
-      auto info = ui::column({.align = FlexAlign::Start, .gap = 2.0f * scale, .flexGrow = 1.0f});
+      auto info = ui::column({.align = FlexAlign::Start, .gap = 2.0F * scale, .flexGrow = 1.0F});
       auto title = ui::row({.align = FlexAlign::Center, .gap = Style::spaceXs * scale});
       const std::string version = plugin.version.empty() ? std::string("?") : plugin.version;
       title->addChild(
@@ -301,18 +302,7 @@ namespace settings {
       }
 
       const auto* manifest = scripting::PluginRegistry::instance().findManifest(plugin.id);
-      const bool hasSettings = [&]() {
-        if (manifest == nullptr) {
-          return false;
-        }
-        if (!manifest->settings.empty()) {
-          return true;
-        }
-        return std::ranges::any_of(manifest->entries, [](const scripting::PluginEntry& entry) {
-          return entry.kind == scripting::PluginEntryKind::Panel && !entry.settings.empty();
-        });
-      }();
-      if (enabled && manifest != nullptr && hasSettings && ctx.onConfigure) {
+      if (enabled && manifest != nullptr && pluginHasSettings(*manifest) && ctx.onConfigure) {
         r->addChild(
             ui::button({
                 .glyph = "settings",
@@ -353,7 +343,7 @@ namespace settings {
       if (busy) {
         r->addChild(
             ui::spinner({
-                .spinnerSize = Style::controlHeightSm * scale * 0.7f,
+                .spinnerSize = Style::controlHeightSm * scale * 0.7F,
                 .spinning = true,
             })
         );
@@ -545,9 +535,21 @@ namespace settings {
       case WidgetControlKind::StringList:
       case WidgetControlKind::StringMap:
         return nullptr;
-      case WidgetControlKind::String:
       case WidgetControlKind::File:
       case WidgetControlKind::Folder:
+        return factory.makePathBrowse(
+            TextSetting{
+                .value = valueAsString(value),
+                .placeholder = {},
+                .width = 190.0F,
+                .browseMode = spec.control == WidgetControlKind::Folder ? TextSettingBrowseMode::SelectFolder
+                                                                        : TextSettingBrowseMode::OpenFile,
+                .browseFileExtensions = spec.extensions,
+                .browseFallbackDirectory = {},
+            },
+            path
+        );
+      case WidgetControlKind::String:
       case WidgetControlKind::Glyph:
       default:
         return factory.makeText(valueAsString(value), {}, path);
@@ -555,6 +557,15 @@ namespace settings {
     }
 
   } // namespace
+
+  bool pluginHasSettings(const scripting::PluginManifest& manifest) {
+    if (!manifest.settings.empty()) {
+      return true;
+    }
+    return std::ranges::any_of(manifest.entries, [](const scripting::PluginEntry& entry) {
+      return entry.kind == scripting::PluginEntryKind::Panel && !entry.settings.empty();
+    });
+  }
 
   void buildPluginSettingsEditor(
       Flex& body, const Config& cfg, SettingsControlFactory& factory, const std::string& pluginId,
@@ -663,6 +674,10 @@ namespace settings {
         )
     );
 
+    if (ctx.config != nullptr && ctx.config->shell.offlineMode) {
+      section->addChild(makeOfflineModeNotice(scale, i18n::tr("settings.window.offline-mode-notice.plugins")));
+    }
+
     // ── Sources ──────────────────────────────────────────────────────────
     auto sourcesHeader = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true});
     sourcesHeader->addChild(makeLabel(
@@ -708,7 +723,7 @@ namespace settings {
       // Separate from the source list so the toggle doesn't read as another source.
       section->addChild(ui::separator({.spacing = Style::spaceSm * scale}));
       auto autoRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true});
-      auto autoInfo = ui::column({.align = FlexAlign::Start, .gap = 2.0f * scale, .flexGrow = 1.0f});
+      auto autoInfo = ui::column({.align = FlexAlign::Start, .gap = 2.0F * scale, .flexGrow = 1.0F});
       autoInfo->addChild(makeLabel(
           i18n::tr("settings.plugins.sources.auto-update"), Style::fontSizeBody * scale, ColorRole::OnSurface,
           FontWeight::Medium

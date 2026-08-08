@@ -11,6 +11,7 @@
 #include "render/scene/node.h"
 #include "shell/dock/pinned_apps.h"
 #include "system/desktop_entry.h"
+#include "ui/builders.h"
 #include "ui/controls/context_menu.h"
 #include "ui/popup_chrome.h"
 #include "ui/style.h"
@@ -27,7 +28,7 @@ namespace shell::dock {
 
     constexpr Logger kLog("dock");
 
-    constexpr float kMenuWidth = 240.0f;
+    constexpr float kMenuWidth = 240.0F;
     constexpr std::int32_t kMenuCloseId = -1;
     constexpr std::int32_t kMenuCloseAllId = -2;
     constexpr std::int32_t kMenuSeparatorId = -3;
@@ -359,14 +360,14 @@ namespace shell::dock {
       const auto fw = static_cast<float>(width);
       const auto fh = static_cast<float>(height);
 
-      menuPtr->sceneRoot = std::make_unique<Node>();
+      menuPtr->sceneRoot = ui::node({});
       menuPtr->sceneRoot->setSize(fw, fh);
       if (Style::popupShadowsEnabled()) {
         (void)popup_chrome::addShadow(
             *menuPtr->sceneRoot, menuPtr->chrome, config.config().shell.shadow, Style::scaledRadiusLg()
         );
       }
-      (void)popup_chrome::addCardBackground(*menuPtr->sceneRoot, menuPtr->chrome, 1.0f);
+      (void)popup_chrome::addCardBackground(*menuPtr->sceneRoot, menuPtr->chrome, 1.0F);
 
       auto ctrl = std::make_unique<ContextMenuControl>();
       ctrl->setMenuWidth(menuPtr->chrome.contentWidth);

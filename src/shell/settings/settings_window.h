@@ -28,6 +28,7 @@
 #include <vector>
 
 class Box;
+class AsyncTextureCache;
 class Button;
 class AccountsService;
 class CalendarService;
@@ -64,6 +65,9 @@ public:
 
   void open(std::string context = "");
   void openToBarWidget(std::string barName, std::string widgetName);
+  // Opens the window on the plugins section with the plugin's settings editor.
+  // Returns false when the plugin is unknown, disabled, or exposes no settings.
+  [[nodiscard]] bool openToPlugin(std::string pluginId);
   void close();
   [[nodiscard]] bool isOpen() const noexcept { return m_surface != nullptr && m_surface->isRunning(); }
   [[nodiscard]] wl_surface* wlSurface() const noexcept {
@@ -99,6 +103,8 @@ public:
   // Source for the bar widget gesture action picker.
   void setIpcService(IpcService* service) { m_ipcService = service; }
   void setClipboardService(ClipboardService* service) { m_clipboardService = service; }
+  // Backs plugin-store thumbnails; trimmed when the window closes.
+  void setAsyncTextureCache(AsyncTextureCache* cache) { m_asyncTextures = cache; }
 
   void onSecondTick();
   void onIdleLiveStatusChanged();
@@ -140,9 +146,10 @@ private:
   void requestSceneRebuild();
   void
   requestContentRebuild(bool refreshRegistry = false, bool refreshFilterRow = false, bool rebuildEditorSheet = false);
+  void scheduleDeferredRebuild();
   void markPluginListDirty();
   void refreshPluginListIfNeeded();
-  void maybeOpenPendingWidgetInspector();
+  void maybeOpenPendingEditor();
   void applyPendingContentScrollTarget(float margin);
   void scrollFocusedAreaIntoView(class InputArea* area);
   void scrollSidebarNodeIntoView(const Node* node);
@@ -169,6 +176,7 @@ private:
   void openPluginSourceCreateEditor(std::optional<PluginSourceConfig> existing = std::nullopt);
   void openPluginSettingsEditor(std::string pluginId);
   void openPluginStore();
+  void openCommunityTemplateStore();
   void openBarWidgetEditorSheet(
       std::string title, std::function<void(Flex&)> populate, std::function<void()> removeAction = nullptr
   );
@@ -181,6 +189,8 @@ private:
   void setSettingOverrides(std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> overrides);
   void clearSettingOverride(std::vector<std::string> path);
   void clearSettingOverrides(std::vector<std::vector<std::string>> paths);
+  // Reverts a bar lane to the config file, including the capsule groups that lane holds.
+  void resetBarLane(std::vector<std::string> lanePath);
   void renameWidgetInstance(
       std::string oldName, std::string newName,
       std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> referenceOverrides
@@ -215,6 +225,7 @@ private:
   CalendarService* m_calendarService = nullptr;
   ClipboardService* m_clipboardService = nullptr;
   IpcService* m_ipcService = nullptr;
+  AsyncTextureCache* m_asyncTextures = nullptr;
   Label* m_idleLiveStatusLabel = nullptr;
   std::vector<Label*> m_sessionActionSummaryLabels;
   std::shared_ptr<std::vector<SessionPanelActionConfig>> m_sessionActionsEditState;
@@ -253,6 +264,11 @@ private:
   bool m_contentRebuildRequested = false;
   bool m_settingsRegistryRefreshRequested = false;
   bool m_filterRowRefreshRequested = false;
+  bool m_deferredRebuildQueued = false;
+  bool m_deferredSceneRebuild = false;
+  bool m_deferredRefreshRegistry = false;
+  bool m_deferredRefreshFilterRow = false;
+  bool m_deferredRebuildEditorSheet = false;
   bool m_focusSearchOnRebuild = false;
   Input* m_settingsSearchInput = nullptr;
   bool m_scrollToPendingContentTarget = false;
@@ -262,10 +278,11 @@ private:
   Node* m_pendingContentScrollTarget = nullptr;
   std::string m_searchQuery;
   Timer m_searchDebounceTimer;
-  // Set by openToBarWidget (e.g. middle-click on a bar widget); consumed once the window holds
-  // keyboard focus so the sheet's grab popup gets a serial the compositor accepts.
+  // Set by openToBarWidget (e.g. middle-click on a bar widget) / openToPlugin; consumed once the
+  // window holds keyboard focus so the sheet's grab popup gets a serial the compositor accepts.
   std::string m_pendingOpenWidgetInspectorName;
-  int m_pendingOpenWidgetInspectorFrames = 0;
+  std::string m_pendingOpenPluginSettingsId;
+  int m_pendingEditorOpenFrames = 0;
   // When the editor sheet is opened programmatically (bar middle-click) there is no grab-valid serial,
   // so open it without an xdg_popup grab. Consumed by openBarWidgetEditorSheet.
   bool m_pendingEditorSheetNoGrab = false;

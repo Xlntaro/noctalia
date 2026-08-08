@@ -2,13 +2,16 @@
 
 #include "ui/builders.h"
 #include "ui/controls/label.h"
+#include "ui/controls/scroll_view.h"
 #include "ui/controls/separator.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 
-#include <cstdint>
+#include <algorithm>
 #include <md4c.h>
 #include <memory>
+#include <numeric>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -16,7 +19,7 @@ namespace {
 
   struct MdContext {
     MarkdownView* view = nullptr;
-    float scale = 1.0f;
+    float scale = 1.0F;
     std::string textBuf;
     int headingLevel = 0;
     bool inCodeBlock = false;
@@ -27,7 +30,9 @@ namespace {
     bool inTable = false;
     bool inTableHeader = false;
     std::vector<std::string> tableRow;
+    std::vector<std::size_t> tableRowWidths;
     std::string tableCellBuf;
+    std::size_t tableCellWidth = 0;
     std::vector<std::pair<std::vector<std::string>, bool>> tableRows;
     std::vector<std::size_t> tableColumnWidths;
   };
@@ -55,19 +60,19 @@ namespace {
 
   std::unique_ptr<Label> makeMarkdownLabel(
       const std::string& text, float fontSize, float scale, ColorRole color, FontWeight weight = FontWeight::Normal,
-      bool markup = false, int maxLines = kWrapUnlimited
+      bool markup = false, int maxLines = kWrapUnlimited, std::optional<float> maxWidth = std::nullopt,
+      std::optional<float> flexGrow = std::nullopt
   ) {
-    auto label = ui::label({
+    return ui::label({
         .text = text,
         .fontSize = fontSize * scale,
         .fontWeight = weight,
         .color = colorSpecFromRole(color),
+        .maxWidth = maxWidth,
         .maxLines = maxLines,
+        .flexGrow = flexGrow,
+        .configure = [markup](Label& label) { label.setUseMarkup(markup); },
     });
-    if (markup) {
-      label->setUseMarkup(true);
-    }
-    return label;
   }
 
   void emitHeading(MdContext& ctx) {
@@ -80,16 +85,16 @@ namespace {
       fontSize = Style::fontSizeTitle;
       break;
     case 3:
-      fontSize = Style::fontSizeBody * 1.1f;
+      fontSize = Style::fontSizeBody * 1.1F;
       break;
     default:
       break;
     }
     ctx.view->addChild(ui::row({.height = Style::spaceSm * ctx.scale}));
     ctx.view->addChild(
-        makeMarkdownLabel(ctx.textBuf, fontSize, ctx.scale, ColorRole::OnSurface, FontWeight::Bold, false, 1)
+        makeMarkdownLabel(ctx.textBuf, fontSize, ctx.scale, ColorRole::Primary, FontWeight::Bold, true, 1)
     );
-    ctx.view->addChild(ui::separator({.spacing = Style::spaceXs * ctx.scale * 0.5f}));
+    ctx.view->addChild(ui::separator({.spacing = Style::spaceXs * ctx.scale * 0.5F}));
   }
 
   void emitParagraph(MdContext& ctx) {
@@ -113,7 +118,7 @@ namespace {
     auto block = ui::column({
         .align = FlexAlign::Start,
         .padding = pad,
-        .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.5f),
+        .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.5F),
         .radius = Style::scaledRadiusSm(ctx.scale),
         .fillWidth = true,
     });
@@ -130,52 +135,121 @@ namespace {
     ctx.view->addChild(std::move(block));
   }
 
+  std::size_t codepointCount(const char* text, unsigned size) {
+    return static_cast<std::size_t>(std::count_if(text, text + size, [](char byte) {
+      return (static_cast<unsigned char>(byte) & 0xC0U) != 0x80U;
+    }));
+  }
+
   void emitTableRow(MdContext& ctx) {
     if (ctx.tableRow.empty()) {
       return;
     }
-    if (ctx.tableColumnWidths.empty()) {
+    if (ctx.tableColumnWidths.size() < ctx.tableRow.size()) {
       ctx.tableColumnWidths.resize(ctx.tableRow.size(), 0);
     }
-    for (std::size_t i = 0; i < ctx.tableRow.size() && i < ctx.tableColumnWidths.size(); ++i) {
-      ctx.tableColumnWidths[i] = std::max(ctx.tableColumnWidths[i], ctx.tableRow[i].size());
+    for (std::size_t i = 0; i < ctx.tableRow.size(); ++i) {
+      const std::size_t width = i < ctx.tableRowWidths.size() ? ctx.tableRowWidths[i] : 0;
+      ctx.tableColumnWidths[i] = std::max(ctx.tableColumnWidths[i], width);
     }
     ctx.tableRows.emplace_back(ctx.tableRow, ctx.inTableHeader);
     ctx.tableRow.clear();
+    ctx.tableRowWidths.clear();
   }
 
   void flushTable(MdContext& ctx) {
     if (ctx.tableRows.empty()) {
       return;
     }
-    std::string block;
-    for (const auto& [cells, isHeader] : ctx.tableRows) {
-      std::string line;
-      for (std::size_t i = 0; i < cells.size(); ++i) {
-        if (i > 0) {
-          line += "  ";
-        }
-        line += cells[i];
-        if (i < ctx.tableColumnWidths.size() && i + 1 < cells.size()) {
-          const auto pad = ctx.tableColumnWidths[i] - cells[i].size();
-          line.append(pad, ' ');
-        }
-      }
-      if (!block.empty()) {
-        block += '\n';
-      }
-      block += line;
+    const float borderWidth = std::max(1.0F, Style::borderWidth * ctx.scale);
+    const float paddingH = Style::spaceSm * ctx.scale;
+    const float paddingV = Style::spaceXs * ctx.scale;
+    const float characterWidth = Style::fontSizeCaption * ctx.scale * 0.62F;
+    std::vector<float> columnWidths;
+    columnWidths.reserve(ctx.tableColumnWidths.size());
+    for (const std::size_t characters : ctx.tableColumnWidths) {
+      columnWidths.push_back(
+          std::clamp(
+              static_cast<float>(characters) * characterWidth + paddingH * 2.0F, 88.0F * ctx.scale, 360.0F * ctx.scale
+          )
+      );
     }
-    auto label = ui::label({
-        .text = block,
-        .fontSize = Style::fontSizeCaption * ctx.scale,
-        .fontFamily = std::string("monospace"),
-        .color = colorSpecFromRole(ColorRole::OnSurface),
-        .maxLines = kWrapUnlimited,
-        .textAlign = TextAlign::Start,
+
+    auto scroll = ui::scrollView({
+        .viewportPaddingH = 0.0F,
+        .viewportPaddingV = 0.0F,
+        .fillWidth = true,
+        .configure = [](ScrollView& view) {
+          view.setOrientation(ScrollOrientation::Horizontal);
+          view.content()->setAlign(FlexAlign::Stretch);
+        },
     });
-    label->setFlexGrow(1.0f);
-    ctx.view->addChild(std::move(label));
+
+    const float totalWidth = std::max(
+        0.0F,
+        std::accumulate(columnWidths.begin(), columnWidths.end(), 0.0F)
+            + borderWidth * static_cast<float>(columnWidths.size() + 1)
+    );
+    auto table = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = borderWidth,
+        .padding = borderWidth,
+        .fill = colorSpecFromRole(ColorRole::Outline),
+        .radius = Style::scaledRadiusSm(ctx.scale),
+        .minWidth = totalWidth,
+        .clipChildren = true,
+    });
+
+    std::size_t bodyRowIndex = 0;
+    for (std::size_t rowIndex = 0; rowIndex < ctx.tableRows.size(); ++rowIndex) {
+      const auto& [cells, isHeader] = ctx.tableRows[rowIndex];
+      const ColorSpec background = isHeader
+          ? colorSpecFromRole(ColorRole::SurfaceVariant)
+          : (bodyRowIndex % 2 == 0 ? colorSpecFromRole(ColorRole::Surface)
+                                   : colorSpecFromRole(ColorRole::SurfaceVariant, 0.5F));
+      auto row = ui::row({
+          .align = FlexAlign::Stretch,
+          .gap = 0.0F,
+          .fill = colorSpecFromRole(ColorRole::Surface),
+          .fillWidth = true,
+      });
+      for (std::size_t i = 0; i < columnWidths.size(); ++i) {
+        if (i > 0) {
+          row->addChild(
+              ui::separator({
+                  .color = colorSpecFromRole(ColorRole::Outline),
+                  .thickness = borderWidth,
+                  .orientation = SeparatorOrientation::VerticalRule,
+                  .gradientEdges = false,
+              })
+          );
+        }
+        auto cell = ui::column({
+            .align = FlexAlign::Stretch,
+            .paddingV = paddingV,
+            .paddingH = paddingH,
+            .fill = background,
+            .minWidth = columnWidths[i],
+            .flexGrow = columnWidths[i],
+        });
+
+        auto label = makeMarkdownLabel(
+            i < cells.size() ? cells[i] : std::string{}, Style::fontSizeCaption, ctx.scale,
+            isHeader ? ColorRole::OnSurfaceVariant : ColorRole::OnSurface,
+            isHeader ? FontWeight::Bold : FontWeight::Normal, true, kWrapUnlimited,
+            std::max(0.0F, columnWidths[i] - paddingH * 2.0F)
+        );
+        cell->addChild(std::move(label));
+        row->addChild(std::move(cell));
+      }
+      table->addChild(std::move(row));
+      if (!isHeader) {
+        ++bodyRowIndex;
+      }
+    }
+
+    scroll->content()->addChild(std::move(table));
+    ctx.view->addChild(std::move(scroll));
     ctx.tableRows.clear();
     ctx.tableColumnWidths.clear();
   }
@@ -184,7 +258,11 @@ namespace {
     if (ctx.textBuf.empty()) {
       return;
     }
-    auto row = ui::row({.align = FlexAlign::Start, .gap = Style::spaceXs * ctx.scale});
+    auto row = ui::row({
+        .align = FlexAlign::Start,
+        .gap = Style::spaceXs * ctx.scale,
+        .fillWidth = true,
+    });
     std::string bullet;
     if (!ctx.listOrderedStack.empty() && ctx.listOrderedStack.back()) {
       bullet = std::to_string(ctx.listItemNumber) + ".";
@@ -194,15 +272,15 @@ namespace {
     row->addChild(
         makeMarkdownLabel(bullet, Style::fontSizeBody, ctx.scale, ColorRole::OnSurfaceVariant, FontWeight::Normal)
     );
-    auto textLabel =
-        makeMarkdownLabel(ctx.textBuf, Style::fontSizeBody, ctx.scale, ColorRole::OnSurface, FontWeight::Normal, true);
+    auto textLabel = makeMarkdownLabel(
+        ctx.textBuf, Style::fontSizeBody, ctx.scale, ColorRole::OnSurface, FontWeight::Normal, true, kWrapUnlimited,
+        std::nullopt, 1.0F
+    );
     ctx.view->trackWrappableLabel(textLabel.get());
-    textLabel->setFlexGrow(1.0f);
     row->addChild(std::move(textLabel));
-    row->setFillWidth(true);
     const float indent = Style::spaceMd * ctx.scale * static_cast<float>(ctx.listOrderedStack.size() - 1);
-    if (indent > 0.0f) {
-      row->setPadding(0.0f, 0.0f, 0.0f, indent);
+    if (indent > 0.0F) {
+      row->setPadding(0.0F, 0.0F, 0.0F, indent);
     }
     ctx.view->addChild(std::move(row));
   }
@@ -248,6 +326,7 @@ namespace {
     case MD_BLOCK_TD:
     case MD_BLOCK_TH:
       ctx->tableCellBuf.clear();
+      ctx->tableCellWidth = 0;
       break;
     default:
       break;
@@ -297,7 +376,9 @@ namespace {
     case MD_BLOCK_TD:
     case MD_BLOCK_TH:
       ctx->tableRow.push_back(ctx->tableCellBuf);
+      ctx->tableRowWidths.push_back(ctx->tableCellWidth);
       ctx->tableCellBuf.clear();
+      ctx->tableCellWidth = 0;
       break;
     default:
       break;
@@ -313,21 +394,22 @@ namespace {
     if (ctx->inCodeBlock) {
       return 0;
     }
+    auto& buf = ctx->inTable ? ctx->tableCellBuf : ctx->textBuf;
     switch (type) {
     case MD_SPAN_STRONG:
-      ctx->textBuf += "<b>";
+      buf += "<b>";
       break;
     case MD_SPAN_EM:
-      ctx->textBuf += "<i>";
+      buf += "<i>";
       break;
     case MD_SPAN_CODE:
-      ctx->textBuf += "<tt>";
+      buf += "<tt>";
       break;
     case MD_SPAN_A:
-      ctx->textBuf += "<u>";
+      buf += "<u>";
       break;
     case MD_SPAN_DEL:
-      ctx->textBuf += "<s>";
+      buf += "<s>";
       break;
     default:
       break;
@@ -340,21 +422,22 @@ namespace {
     if (ctx->inCodeBlock) {
       return 0;
     }
+    auto& buf = ctx->inTable ? ctx->tableCellBuf : ctx->textBuf;
     switch (type) {
     case MD_SPAN_STRONG:
-      ctx->textBuf += "</b>";
+      buf += "</b>";
       break;
     case MD_SPAN_EM:
-      ctx->textBuf += "</i>";
+      buf += "</i>";
       break;
     case MD_SPAN_CODE:
-      ctx->textBuf += "</tt>";
+      buf += "</tt>";
       break;
     case MD_SPAN_A:
-      ctx->textBuf += "</u>";
+      buf += "</u>";
       break;
     case MD_SPAN_DEL:
-      ctx->textBuf += "</s>";
+      buf += "</s>";
       break;
     default:
       break;
@@ -365,30 +448,54 @@ namespace {
   int onText(MD_TEXTTYPE type, const MD_CHAR* text, MD_SIZE size, void* userdata) {
     auto* ctx = static_cast<MdContext*>(userdata);
     auto& buf = ctx->inTable ? ctx->tableCellBuf : ctx->textBuf;
+    const auto appendEscaped = [&] {
+      escapeForPango(buf, text, size);
+      if (ctx->inTable) {
+        ctx->tableCellWidth += codepointCount(text, size);
+      }
+    };
+    const auto appendRaw = [&] {
+      buf.append(text, size);
+      if (ctx->inTable) {
+        ctx->tableCellWidth += codepointCount(text, size);
+      }
+    };
     switch (type) {
     case MD_TEXT_NORMAL:
       if (ctx->inCodeBlock) {
-        buf.append(text, size);
-      } else if (ctx->inTable) {
-        buf.append(text, size);
+        appendRaw();
       } else {
-        escapeForPango(buf, text, size);
+        appendEscaped();
       }
       break;
     case MD_TEXT_CODE:
-      buf.append(text, size);
+      if (ctx->inCodeBlock) {
+        appendRaw();
+      } else {
+        appendEscaped();
+      }
       break;
     case MD_TEXT_SOFTBR:
       buf += ' ';
+      if (ctx->inTable) {
+        ++ctx->tableCellWidth;
+      }
       break;
     case MD_TEXT_BR:
       buf += '\n';
       break;
     case MD_TEXT_ENTITY:
       buf.append(text, size);
+      if (ctx->inTable) {
+        ++ctx->tableCellWidth;
+      }
       break;
     default:
-      buf.append(text, size);
+      if (ctx->inCodeBlock) {
+        appendRaw();
+      } else {
+        appendEscaped();
+      }
       break;
     }
     return 0;
@@ -427,9 +534,25 @@ void MarkdownView::clear() {
   }
 }
 
+LayoutSize MarkdownView::doMeasure(Renderer& renderer, const LayoutConstraints& constraints) {
+  // Apply the wrap width before measuring: labels otherwise report single-line
+  // sizes, the parent allocates too little height for the view, and sibling
+  // rows overlap it. doLayout re-applies the final arranged width.
+  float w = width();
+  if (constraints.hasMaxWidth && constraints.maxWidth > 0.0F) {
+    w = constraints.maxWidth;
+  }
+  if (w > 0.0F) {
+    for (Label* label : m_wrappableLabels) {
+      label->setMaxWidth(w);
+    }
+  }
+  return Flex::doMeasure(renderer, constraints);
+}
+
 void MarkdownView::doLayout(Renderer& renderer) {
   const float w = width();
-  if (w > 0.0f) {
+  if (w > 0.0F) {
     for (Label* label : m_wrappableLabels) {
       label->setMaxWidth(w);
     }

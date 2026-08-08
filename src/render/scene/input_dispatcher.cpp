@@ -191,8 +191,8 @@ bool InputDispatcher::pointerButton(float x, float y, std::uint32_t button, bool
       }
     }
 
-    float localX = 0.0f;
-    float localY = 0.0f;
+    float localX = 0.0F;
+    float localY = 0.0F;
     (void)Node::mapFromScene(target, x, y, localX, localY);
     // Register capture before dispatchPress.
     if (pressed) {
@@ -236,7 +236,7 @@ void InputDispatcher::syncPointerHover() {
 
 bool InputDispatcher::pointerAxis(
     float x, float y, std::uint32_t axis, std::uint32_t axisSource, double value, std::int32_t discrete,
-    std::int32_t value120, float lines
+    std::int32_t value120, float lines, std::uint32_t axisGestureSerial
 ) {
   pruneDetachedAreas();
   InputArea* target = m_capturedArea != nullptr ? m_capturedArea : findInputAreaAt(x, y);
@@ -251,10 +251,11 @@ bool InputDispatcher::pointerAxis(
       continue;
     }
 
-    float localX = 0.0f;
-    float localY = 0.0f;
+    float localX = 0.0F;
+    float localY = 0.0F;
     (void)Node::mapFromScene(area, x, y, localX, localY);
-    const bool consumed = area->dispatchAxis(localX, localY, axis, axisSource, value, discrete, value120, lines);
+    const bool consumed =
+        area->dispatchAxis(localX, localY, axis, axisSource, value, discrete, value120, lines, axisGestureSerial);
 
     if (!consumed) {
       continue;
@@ -493,8 +494,8 @@ void InputDispatcher::updateHover(float x, float y, std::uint32_t serial) {
 
   // While a button is held, all motion goes to the captured area; hover stays frozen.
   if (m_capturedArea != nullptr) {
-    float localX = 0.0f;
-    float localY = 0.0f;
+    float localX = 0.0F;
+    float localY = 0.0F;
     (void)Node::mapFromScene(m_capturedArea, x, y, localX, localY);
     m_capturedArea->dispatchMotion(localX, localY);
     updateCursor(serial);
@@ -514,14 +515,14 @@ void InputDispatcher::updateHover(float x, float y, std::uint32_t serial) {
     }
     if (m_hoveredArea != nullptr) {
       trackArea(m_hoveredArea);
-      float localX = 0.0f;
-      float localY = 0.0f;
+      float localX = 0.0F;
+      float localY = 0.0F;
       (void)Node::mapFromScene(m_hoveredArea, x, y, localX, localY);
       m_hoveredArea->dispatchEnter(localX, localY);
     }
   } else if (m_hoveredArea != nullptr) {
-    float localX = 0.0f;
-    float localY = 0.0f;
+    float localX = 0.0F;
+    float localY = 0.0F;
     (void)Node::mapFromScene(m_hoveredArea, x, y, localX, localY);
     m_hoveredArea->dispatchMotion(localX, localY);
   }

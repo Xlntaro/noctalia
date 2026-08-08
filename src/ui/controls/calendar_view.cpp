@@ -2,9 +2,12 @@
 
 #include "calendar/calendar_types.h"
 #include "core/ui_phase.h"
+#include "cursor-shape-v1-client-protocol.h"
 #include "i18n/i18n.h"
+#include "net/url_open.h"
 #include "render/core/color.h"
 #include "render/scene/input_area.h"
+#include "render/scene/node.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
@@ -42,7 +45,11 @@ namespace {
     std::tm value{};
     value.tm_mon = month;
     value.tm_mday = 1;
+#ifdef __GLIBC__
+    return formatStrftime("%OB", value);
+#else
     return formatStrftime("%B", value);
+#endif
   }
 
   int localDateKey(std::chrono::system_clock::time_point time) {
@@ -123,8 +130,8 @@ namespace calendar_view {
     const MonthLayout& layout = options.layout;
     const float weekOverhead = options.showWeekNumbers
         ? layout.weekColumnWidth + layout.weekLaneInset + layout.weekDividerWidth + layout.weekDaysGap
-        : 0.0f;
-    const float dayGridWidth = std::max(0.0f, layout.width - weekOverhead);
+        : 0.0F;
+    const float dayGridWidth = std::max(0.0F, layout.width - weekOverhead);
 
     const int firstDayOfWeek = localeFirstDayOfWeek();
     std::array<std::string, 7> weekdays;
@@ -193,7 +200,7 @@ namespace calendar_view {
     dayGrid->setColumns(7);
     dayGrid->setColumnGap(layout.gap);
     dayGrid->setStretchItems(true);
-    dayGrid->setSize(dayGridWidth, 6.0f * layout.dayCellHeight + 5.0f * layout.gap);
+    dayGrid->setSize(dayGridWidth, 6.0F * layout.dayCellHeight + 5.0F * layout.gap);
     dayGrid->setMinCellHeight(layout.dayCellHeight);
 
     int inMonthDay = 1;
@@ -230,7 +237,7 @@ namespace calendar_view {
           .variant = ButtonVariant::Ghost,
           .minWidth = layout.dayButtonSize,
           .minHeight = layout.dayButtonSize,
-          .padding = 0.0f,
+          .padding = 0.0F,
           .radius = Style::scaledRadiusMd(options.scale),
           .width = layout.dayButtonSize,
           .height = layout.dayButtonSize,
@@ -241,7 +248,7 @@ namespace calendar_view {
 
       if (!inMonth) {
         Button::ButtonPalette muted = Button::defaultPalette(ButtonVariant::Ghost);
-        muted.normal.label = colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.75f);
+        muted.normal.label = colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.75F);
         button->setCustomPalette(muted);
       } else if (options.selected == date) {
         button->setVariant(ButtonVariant::Primary);
@@ -275,14 +282,14 @@ namespace calendar_view {
           dots->addChild(
               ui::box({
                   .fill = color,
-                  .radius = layout.dotDiameter * 0.5f,
+                  .radius = layout.dotDiameter * 0.5F,
                   .width = layout.dotDiameter,
                   .height = layout.dotDiameter,
               })
           );
         }
       }
-      auto dotArea = std::make_unique<InputArea>();
+      auto dotArea = ui::inputArea({});
       dotArea->setSize(layout.dayButtonSize, layout.dotDiameter);
       dotArea->setOnClick([selectDate](const InputArea::PointerData&) { selectDate(); });
       dotArea->addChild(std::move(dots));
@@ -290,7 +297,7 @@ namespace calendar_view {
       dayGrid->addChild(std::move(tile));
     }
 
-    const float gridHeight = layout.weekdayHeight + layout.gap + 6.0f * layout.dayCellHeight + 5.0f * layout.gap;
+    const float gridHeight = layout.weekdayHeight + layout.gap + 6.0F * layout.dayCellHeight + 5.0F * layout.gap;
     auto days = ui::column({.gap = layout.gap});
     days->setSize(dayGridWidth, gridHeight);
     days->addChild(std::move(weekdayRow));
@@ -313,7 +320,7 @@ namespace calendar_view {
                 .text = std::format("{:%V}", firstThursday + std::chrono::days{row * 7}),
                 .fontSize = Style::fontSizeCaption * options.scale,
                 .fontFamily = options.fontFamily,
-                .color = colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.7f),
+                .color = colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.7F),
                 .maxLines = 1,
             })
         );
@@ -329,13 +336,13 @@ namespace calendar_view {
       }
       weekColumn->setSize(layout.weekColumnWidth, gridHeight);
 
-      auto row = ui::row({.gap = 0.0f});
+      auto row = ui::row({.gap = 0.0F});
       row->setSize(layout.width, gridHeight);
       row->addChild(std::move(weekColumn));
-      if (layout.weekLaneInset > 0.0f) {
+      if (layout.weekLaneInset > 0.0F) {
         row->addChild(spacer(layout.weekLaneInset, gridHeight));
       }
-      if (layout.weekDividerWidth > 0.0f) {
+      if (layout.weekDividerWidth > 0.0F) {
         row->addChild(
             ui::separator({
                 .thickness = layout.weekDividerWidth,
@@ -345,7 +352,7 @@ namespace calendar_view {
             })
         );
       }
-      if (layout.weekDaysGap > 0.0f) {
+      if (layout.weekDaysGap > 0.0F) {
         row->addChild(spacer(layout.weekDaysGap, gridHeight));
       }
       row->addChild(std::move(days));
@@ -365,6 +372,9 @@ namespace calendar_view {
     content->setDirection(FlexDirection::Vertical);
     content->setAlign(FlexAlign::Stretch);
     content->setGap(Style::spaceSm * options.scale);
+    if (options.state != nullptr) {
+      options.state->linkOverlays.clear();
+    }
     while (!content->children().empty()) {
       content->removeChild(content->children().front().get());
     }
@@ -382,7 +392,9 @@ namespace calendar_view {
     const float dotWidth = Style::spaceXs * options.scale;
     const float rowGap = Style::spaceSm * options.scale;
     const float textMaxWidth =
-        std::max(40.0f, options.scroll.contentViewportWidth(options.reserveScrollbarGutter) - dotWidth - rowGap);
+        std::max(40.0F, options.scroll.contentViewportWidth(options.reserveScrollbarGutter) - dotWidth - rowGap);
+    const float linkGlyphSize = Style::fontSizeCaption * options.scale;
+    const float linkGlyphGap = Style::spaceXs * options.scale;
     const int selectedKey = dateKey(options.selected);
     bool hasEvents = false;
     if (options.snapshot != nullptr) {
@@ -392,6 +404,9 @@ namespace calendar_view {
           continue;
         }
         hasEvents = true;
+        const bool hasLink = options.state != nullptr && !event.url.empty();
+        const float timeMaxWidth =
+            hasLink ? std::max(40.0F, textMaxWidth - linkGlyphSize - linkGlyphGap) : textMaxWidth;
 
         std::string timeText;
         if (event.allDay) {
@@ -401,8 +416,29 @@ namespace calendar_view {
           timeText = formatLocalUnixTime(static_cast<std::int64_t>(raw), options.timeFormat);
         }
 
+        auto time = ui::label({
+            .text = timeText,
+            .fontSize = Style::fontSizeCaption * options.scale,
+            .fontFamily = options.fontFamily,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxWidth = timeMaxWidth,
+            .maxLines = 1,
+        });
+        std::unique_ptr<Node> timeLine = std::move(time);
+        if (hasLink) {
+          timeLine = ui::row(
+              {.align = FlexAlign::Center, .gap = linkGlyphGap}, std::move(timeLine),
+              ui::glyph({
+                  .glyph = "external-link",
+                  .glyphSize = linkGlyphSize,
+                  .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+                  .flexGrow = 0.0F,
+              })
+          );
+        }
+
         auto details = ui::column(
-            {.align = FlexAlign::Start, .gap = Style::spaceXs * 0.5f * options.scale, .flexGrow = 1.0f},
+            {.align = FlexAlign::Start, .gap = Style::spaceXs * 0.5F * options.scale, .flexGrow = 1.0F},
             ui::label({
                 .text = event.title.empty() ? i18n::tr("control-center.calendar.events") : event.title,
                 .fontSize = Style::fontSizeBody * options.scale,
@@ -411,27 +447,48 @@ namespace calendar_view {
                 .maxWidth = textMaxWidth,
                 .maxLines = 3,
             }),
-            ui::label({
-                .text = timeText,
-                .fontSize = Style::fontSizeCaption * options.scale,
-                .fontFamily = options.fontFamily,
-                .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-                .maxWidth = textMaxWidth,
-                .maxLines = 1,
-            })
+            std::move(timeLine)
         );
-        content->addChild(
-            ui::row(
-                {.align = FlexAlign::Stretch, .gap = rowGap},
-                ui::box({
-                    .fill = eventColor(event),
-                    .radius = dotWidth * 0.5f,
-                    .width = dotWidth,
-                    .flexGrow = 0.0f,
-                }),
-                std::move(details)
-            )
+
+        Flex* eventRow = nullptr;
+        auto eventRowNode = ui::row(
+            {.out = &eventRow, .align = FlexAlign::Stretch, .gap = rowGap},
+            ui::box({
+                .fill = eventColor(event),
+                .radius = dotWidth * 0.5F,
+                .width = dotWidth,
+                .flexGrow = 0.0F,
+            }),
+            std::move(details)
         );
+        if (hasLink && eventRow != nullptr) {
+          auto area = ui::inputArea({});
+          area->setParticipatesInLayout(false);
+          area->setZIndex(1);
+          area->setCursorShape(WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER);
+          area->setTooltip(event.url);
+
+          Flex* row = eventRow;
+          const float radius = Style::radiusSm * options.scale;
+          const auto setHovered = [row, radius, requestRedraw = options.requestRedraw](bool hovered) {
+            if (hovered) {
+              row->setRadius(radius);
+              row->setFill(colorSpecFromRole(ColorRole::Hover));
+            } else {
+              row->clearFill();
+            }
+            if (requestRedraw) {
+              requestRedraw();
+            }
+          };
+          area->setOnEnter([setHovered](const InputArea::PointerData&) { setHovered(true); });
+          area->setOnLeave([setHovered]() { setHovered(false); });
+          area->setOnClick([url = event.url](const InputArea::PointerData&) { (void)net::openInBrowser(url); });
+
+          options.state->linkOverlays.push_back({.row = row, .area = area.get()});
+          eventRow->addChild(std::move(area));
+        }
+        content->addChild(std::move(eventRowNode));
       }
     }
 
@@ -445,6 +502,16 @@ namespace calendar_view {
               .maxLines = 1,
           })
       );
+    }
+  }
+
+  void layoutEventLinkOverlays(const EventListState& state) {
+    for (const auto& [row, area] : state.linkOverlays) {
+      if (row == nullptr || area == nullptr) {
+        continue;
+      }
+      area->setPosition(0.0F, 0.0F);
+      area->setSize(row->width(), row->height());
     }
   }
 

@@ -71,9 +71,8 @@ public:
   // each update/layout pass. Lets content that arrives or changes after the
   // scene build request keyboard focus (e.g. a plugin input with focus = true).
   [[nodiscard]] virtual InputArea* takePendingFocusArea() { return nullptr; }
-  // Panel placement policy. `Attached` merges with the bar when a suitable host
-  // exists, `Floating` opens detached near the bar, and `Centered` opens in the
-  // middle of the target output.
+  // Panel placement policy. `Attached` anchors the panel surface to a suitable
+  // bar edge; `Floating` opens detached and uses panelScreenPosition().
   [[nodiscard]] virtual PanelPlacement panelPlacement() const noexcept { return PanelPlacement::Floating; }
   // Floating screen position (one of kPanelPositions). Plugin panels override; built-in
   // panels resolve through shell.panel.*_position in PanelManager.
@@ -87,7 +86,7 @@ public:
   // attachedBackgroundOpacityOverride() instead — useful for panels whose contents need
   // a fixed alpha for legibility (e.g. wallpaper thumbnails).
   [[nodiscard]] virtual bool inheritsBarBackgroundOpacity() const noexcept { return true; }
-  [[nodiscard]] virtual float attachedBackgroundOpacityOverride() const noexcept { return 1.0f; }
+  [[nodiscard]] virtual float attachedBackgroundOpacityOverride() const noexcept { return 1.0F; }
   [[nodiscard]] virtual bool wantsCloseAnimation() const noexcept { return true; }
   [[nodiscard]] virtual bool dismissOnOutsideClick() const { return true; }
   // True to live in PersistentPanelHost instead of PanelManager's single active
@@ -103,7 +102,7 @@ public:
   void setPendingOpenContext(std::string_view context) { m_pendingOpenContext = std::string(context); }
   [[nodiscard]] std::string_view pendingOpenContext() const noexcept { return m_pendingOpenContext; }
   void setPanelCardOpacity(float opacity) noexcept {
-    const float clamped = std::clamp(opacity, 0.0f, 1.0f);
+    const float clamped = std::clamp(opacity, 0.0F, 1.0F);
     if (m_panelCardOpacity == clamped) {
       return;
     }
@@ -126,8 +125,8 @@ protected:
   virtual void doLayout(Renderer& renderer, float width, float height) = 0;
   virtual void doUpdate(Renderer& renderer) { (void)renderer; }
 
-  float m_contentScale = 1.0f;
-  float m_panelCardOpacity = 1.0f;
+  float m_contentScale = 1.0F;
+  float m_panelCardOpacity = 1.0F;
   std::string m_pendingOpenContext;
   AnimationManager* m_animations = nullptr;
 

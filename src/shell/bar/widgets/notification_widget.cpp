@@ -11,14 +11,14 @@
 #include <memory>
 
 namespace {
-  constexpr float kDotBaseSize = 6.0f;
+  constexpr float kDotBaseSize = 6.0F;
 } // namespace
 
 NotificationWidget::NotificationWidget(NotificationManager* manager, wl_output* /*output*/, Options options)
     : m_manager(manager), m_hideWhenNoUnread(options.hideWhenNoUnread) {}
 
 void NotificationWidget::create() {
-  auto area = std::make_unique<InputArea>();
+  auto area = ui::inputArea({});
 
   area->addChild(
       ui::glyph({
@@ -33,7 +33,7 @@ void NotificationWidget::create() {
   m_dot = area->addChild(
       ui::box({
           .fill = colorSpecFromRole(ColorRole::Primary),
-          .radius = dotSize * 0.5f,
+          .radius = dotSize * 0.5F,
           .width = dotSize,
           .height = dotSize,
           .visible = false,
@@ -60,7 +60,7 @@ void NotificationWidget::doLayout(Renderer& renderer, float /*containerWidth*/, 
 
   refreshIndicatorState();
   if (!rootNode->visible()) {
-    rootNode->setSize(0.0f, 0.0f);
+    rootNode->setSize(0.0F, 0.0F);
     return;
   }
 
@@ -68,12 +68,12 @@ void NotificationWidget::doLayout(Renderer& renderer, float /*containerWidth*/, 
   m_glyph->setGlyph(m_dndEnabled ? "bell-off" : "bell");
   m_glyph->setColor(widgetIconColorOr(colorSpecFromRole(ColorRole::OnSurface)));
   m_glyph->measure(renderer);
-  m_glyph->setPosition(0.0f, 0.0f);
+  m_glyph->setPosition(0.0F, 0.0F);
   rootNode->setSize(m_glyph->width(), m_glyph->height());
 
   if (m_dot != nullptr) {
     const float dotSize = kDotBaseSize * m_contentScale;
-    m_dot->setPosition(m_glyph->width() - dotSize, 0.0f);
+    m_dot->setPosition(m_glyph->width() - dotSize, 0.0F);
   }
 }
 
@@ -91,7 +91,7 @@ void NotificationWidget::refreshIndicatorState() {
     rootNode->setVisible(showWidget);
     rootNode->setParticipatesInLayout(showWidget);
     if (!showWidget) {
-      rootNode->setSize(0.0f, 0.0f);
+      rootNode->setSize(0.0F, 0.0F);
     }
   }
 

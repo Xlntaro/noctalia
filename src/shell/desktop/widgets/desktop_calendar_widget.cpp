@@ -23,17 +23,17 @@
 
 namespace {
 
-  constexpr float kCalendarWidth = 340.0f;
-  constexpr float kEventsWidth = 240.0f;
-  constexpr float kWidgetHeight = 390.0f;
+  constexpr float kCalendarWidth = 340.0F;
+  constexpr float kEventsWidth = 240.0F;
+  constexpr float kWidgetHeight = 390.0F;
   constexpr float kSectionGap = Style::spaceLg;
   constexpr float kGridGap = Style::spaceXs;
   constexpr float kHeaderHeight = Style::controlHeight;
-  constexpr float kWeekdayHeight = 20.0f;
-  constexpr float kDayCellHeight = 43.0f;
-  constexpr float kDayButtonSize = 34.0f;
-  constexpr float kDotDiameter = 4.0f;
-  constexpr float kWeekColumnWidth = 24.0f;
+  constexpr float kWeekdayHeight = 20.0F;
+  constexpr float kDayCellHeight = 43.0F;
+  constexpr float kDayButtonSize = 34.0F;
+  constexpr float kDotDiameter = 4.0F;
+  constexpr float kWeekColumnWidth = 24.0F;
   constexpr std::string_view kEventDateFormat = "%A %e %B";
   constexpr std::string_view kEventTimeFormat = "%H:%M";
 
@@ -63,8 +63,8 @@ void DesktopCalendarWidget::create() {
       return;
     }
     const float steps = data.scrollSteps();
-    if (steps != 0.0f) {
-      changeMonthBy(steps > 0.0f ? 1 : -1);
+    if (steps != 0.0F) {
+      changeMonthBy(steps > 0.0F ? 1 : -1);
     }
   });
 
@@ -112,7 +112,7 @@ void DesktopCalendarWidget::create() {
           .color = colorSpecFromRole(ColorRole::OnSurface),
           .maxLines = 1,
           .textAlign = TextAlign::Center,
-          .flexGrow = 1.0f,
+          .flexGrow = 1.0F,
           .configure = [this](Label& label) {
             label.setHitTestVisible(true);
             label.setOnClick([this](const InputArea::PointerData&) { focusToday(); });
@@ -156,7 +156,7 @@ void DesktopCalendarWidget::create() {
           .out = &m_eventsScroll,
           .fillWidth = true,
           .fillHeight = true,
-          .flexGrow = 1.0f,
+          .flexGrow = 1.0F,
       })
   );
   root->addChild(std::move(eventsColumn));
@@ -203,10 +203,10 @@ void DesktopCalendarWidget::doLayout(Renderer& renderer) {
   }
 
   const float scale = contentScale();
-  const float calendarWidth = (kCalendarWidth + (m_showWeekNumbers ? kWeekColumnWidth + kGridGap : 0.0f)) * scale;
+  const float calendarWidth = (kCalendarWidth + (m_showWeekNumbers ? kWeekColumnWidth + kGridGap : 0.0F)) * scale;
   const float eventsWidth = kEventsWidth * scale;
   const float height = kWidgetHeight * scale;
-  const float totalWidth = calendarWidth + (m_showEvents ? (kSectionGap * scale + eventsWidth) : 0.0f);
+  const float totalWidth = calendarWidth + (m_showEvents ? (kSectionGap * scale + eventsWidth) : 0.0F);
 
   m_rootLayout->setGap(kSectionGap * scale);
   m_rootLayout->setSize(totalWidth, height);
@@ -233,7 +233,7 @@ void DesktopCalendarWidget::doLayout(Renderer& renderer) {
   }
   if (m_monthLabel != nullptr) {
     m_monthLabel->setFontSize((Style::fontSizeTitle + Style::spaceXs) * scale);
-    m_monthLabel->setMaxWidth(std::max(1.0f, calendarWidth - 2.0f * kHeaderHeight * scale));
+    m_monthLabel->setMaxWidth(std::max(1.0F, calendarWidth - 2.0F * kHeaderHeight * scale));
   }
   if (m_eventsColumn != nullptr) {
     m_eventsColumn->setVisible(m_showEvents);
@@ -245,7 +245,7 @@ void DesktopCalendarWidget::doLayout(Renderer& renderer) {
     m_eventsTitle->setMaxWidth(eventsWidth);
   }
   if (m_eventsScroll != nullptr) {
-    m_eventsScroll->setSize(eventsWidth, std::max(1.0f, height - 40.0f * scale));
+    m_eventsScroll->setSize(eventsWidth, std::max(1.0F, height - 40.0F * scale));
     m_eventsScroll->setViewportPaddingH(Style::spaceXs * scale);
     m_eventsScroll->setViewportPaddingV(Style::spaceXs * scale);
   }
@@ -255,6 +255,7 @@ void DesktopCalendarWidget::doLayout(Renderer& renderer) {
     rebuildEventList();
   }
   m_rootLayout->layout(renderer);
+  calendar_view::layoutEventLinkOverlays(m_eventListState);
   m_dirty = false;
 }
 
@@ -314,10 +315,10 @@ void DesktopCalendarWidget::rebuildCalendar() {
   }
   const float scale = contentScale();
   const float gap = kGridGap * scale;
-  const float calendarWidth = (kCalendarWidth + (m_showWeekNumbers ? kWeekColumnWidth + kGridGap : 0.0f)) * scale;
-  const float weekWidth = m_showWeekNumbers ? kWeekColumnWidth * scale : 0.0f;
-  const float dayGridWidth = calendarWidth - (m_showWeekNumbers ? weekWidth + gap : 0.0f);
-  const float dayColumnWidth = std::max(1.0f, (dayGridWidth - 6.0f * gap) / 7.0f);
+  const float calendarWidth = (kCalendarWidth + (m_showWeekNumbers ? kWeekColumnWidth + kGridGap : 0.0F)) * scale;
+  const float weekWidth = m_showWeekNumbers ? kWeekColumnWidth * scale : 0.0F;
+  const float dayGridWidth = calendarWidth - (m_showWeekNumbers ? weekWidth + gap : 0.0F);
+  const float dayColumnWidth = std::max(1.0F, (dayGridWidth - 6.0F * gap) / 7.0F);
   const float buttonSize = std::min(kDayButtonSize * scale, dayColumnWidth);
 
   calendar_view::rebuildMonth({
@@ -336,9 +337,9 @@ void DesktopCalendarWidget::rebuildCalendar() {
               .dayButtonSize = buttonSize,
               .gap = gap,
               .dotDiameter = kDotDiameter * scale,
-              .dotGap = 2.0f * scale,
+              .dotGap = 2.0F * scale,
               .weekColumnWidth = weekWidth,
-              .weekDaysGap = m_showWeekNumbers ? gap : 0.0f,
+              .weekDaysGap = m_showWeekNumbers ? gap : 0.0F,
           },
       .fontFamily = m_fontFamily,
       .onDateSelected = [this](calendar_view::Date date, int monthShift) {
@@ -366,5 +367,7 @@ void DesktopCalendarWidget::rebuildEventList() {
       .dateFormat = kEventDateFormat,
       .timeFormat = kEventTimeFormat,
       .fontFamily = m_fontFamily,
+      .state = &m_eventListState,
+      .requestRedraw = [this]() { requestRedraw(); },
   });
 }

@@ -36,7 +36,7 @@ public:
   bool pointerButton(float x, float y, std::uint32_t button, bool pressed);
   bool pointerAxis(
       float x, float y, std::uint32_t axis, std::uint32_t axisSource, double value, std::int32_t discrete,
-      std::int32_t value120, float lines
+      std::int32_t value120, float lines, std::uint32_t axisGestureSerial = 0
   );
   void cancelPointerCapture();
 
@@ -80,8 +80,8 @@ private:
   std::optional<std::size_t> m_stashedTabFocusIndex;
   std::optional<std::string> m_stashedTabFocusKey;
   std::uint32_t m_lastSerial = 0;
-  float m_lastPointerX = 0.0f;
-  float m_lastPointerY = 0.0f;
+  float m_lastPointerX = 0.0F;
+  float m_lastPointerY = 0.0F;
   bool m_hasPointerPosition = false;
   bool m_cancelingPointerCapture = false;
 };

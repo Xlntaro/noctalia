@@ -100,6 +100,15 @@ namespace {
     return type != UPowerDeviceType::Unknown && type != UPowerDeviceType::LinePower;
   }
 
+  // A battery belonging to a peripheral rather than to the system. UPower reports peripheral packs
+  // with PowerSupply=false, so only PowerSupply batteries and UPS units power the machine itself.
+  bool isPeripheralBattery(const UPowerDeviceInfo& info) {
+    return info.isPresent
+        && isBatteryCapableDeviceType(info.type)
+        && !info.isLaptopBattery()
+        && info.type != UPowerDeviceType::Ups;
+  }
+
   bool isAutoSelector(std::string_view selector) {
     const std::string normalized = StringUtils::toLower(StringUtils::trim(selector));
     return normalized.empty() || normalized == "auto";
@@ -191,14 +200,14 @@ UPowerService::UPowerService(SystemBus& bus) : m_bus(bus) {
 
   if (SysUtils::isEnvFlagOn("NOCTALIA_DUMMY_BATTERY")) {
     m_dummyDevice = makeDummyBatteryDevice();
-    kLog.info("dummy battery enabled ({:.0f}% discharging)", m_dummyDevice->state.percentage);
+    kLog.info("dummy battery enabled ({:.0F}% discharging)", m_dummyDevice->state.percentage);
   }
 
   rescanDevices();
 
   if (m_state.isPresent) {
     kLog.info(
-        "battery {:.0f}% state={} ({})", m_state.percentage, static_cast<int>(m_state.state),
+        "battery {:.0F}% state={} ({})", m_state.percentage, static_cast<int>(m_state.state),
         m_state.onBattery ? "on battery" : "on AC"
     );
   } else {
@@ -392,6 +401,18 @@ const UPowerDeviceInfo* UPowerService::deviceForSelector(std::string_view select
       && isBatteryCapableDeviceType(m_dummyDevice->type)
       && upowerDeviceMatchesSelector(*m_dummyDevice, trimmed)) {
     return &*m_dummyDevice;
+  }
+  return nullptr;
+}
+
+const UPowerDeviceInfo* UPowerService::peripheralBatteryForSerial(std::string_view serial) const {
+  if (serial.empty()) {
+    return nullptr;
+  }
+  for (const auto& device : m_devices) {
+    if (isPeripheralBattery(device.info) && StringUtils::equalsInsensitive(device.info.serial, serial)) {
+      return &device.info;
+    }
   }
   return nullptr;
 }

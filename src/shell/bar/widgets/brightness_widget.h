@@ -11,8 +11,6 @@ class BrightnessWidget : public Widget {
 public:
   struct Options {
     bool showLabel = true;
-
-    bool operator==(const Options&) const = default;
   };
 
   BrightnessWidget(BrightnessService* brightness, wl_output* output, Options options);
@@ -30,7 +28,7 @@ private:
   Glyph* m_glyph = nullptr;
   Label* m_label = nullptr;
   bool m_lastAvailable = false;
-  float m_lastBrightness = -1.0f;
+  float m_lastBrightness = -1.0F;
   bool m_isVertical = false;
   bool m_lastVertical = false;
 };

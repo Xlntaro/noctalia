@@ -11,6 +11,7 @@
 #include "shell/screen_position.h"
 #include "shell/surface/shadow.h"
 #include "shell/tooltip/tooltip_manager.h"
+#include "ui/builders.h"
 #include "ui/controls/box.h"
 #include "ui/palette.h"
 #include "ui/style.h"
@@ -115,8 +116,8 @@ void PersistentPanelHost::open(const std::string& id, wl_output* output, std::st
 
   const bool fillWidth = panel->fillsWidth();
   const bool fillHeight = panel->fillsHeight();
-  auto panelWidth = static_cast<std::uint32_t>(std::max(1.0f, std::round(panel->preferredWidth())));
-  auto panelHeight = static_cast<std::uint32_t>(std::max(1.0f, std::round(panel->preferredHeight())));
+  auto panelWidth = static_cast<std::uint32_t>(std::max(1.0F, std::round(panel->preferredWidth())));
+  auto panelHeight = static_cast<std::uint32_t>(std::max(1.0F, std::round(panel->preferredHeight())));
   const auto padding = screenPadding();
   if (outputWidth > 0) {
     panelWidth = std::min(panelWidth, static_cast<std::uint32_t>(std::max(1, outputWidth - padding * 2)));
@@ -291,13 +292,13 @@ void PersistentPanelHost::buildScene(Instance& instance, std::uint32_t width, st
   }
 
   const bool hasDecoration = instance.panel->hasDecoration();
-  instance.sceneRoot = std::make_unique<Node>();
+  instance.sceneRoot = ui::node({});
   instance.sceneRoot->setAnimationManager(&instance.animations);
   instance.sceneRoot->setSize(static_cast<float>(width), static_cast<float>(height));
 
   const auto& shadowConfig = m_config->config().shell.shadow;
   if (hasDecoration && shell::surface_shadow::enabled(true, shadowConfig)) {
-    auto shadow = std::make_unique<Box>();
+    auto shadow = ui::box({});
     instance.shadowNode = static_cast<Box*>(instance.sceneRoot->addChild(std::move(shadow)));
     instance.shadowNode->setZIndex(-1);
     instance.shadowNode->setVisible(m_config->config().shell.panel.shadow);
@@ -305,13 +306,13 @@ void PersistentPanelHost::buildScene(Instance& instance, std::uint32_t width, st
 
   const float backgroundOpacity = shell::panel_surface::backgroundOpacity(m_config);
   if (hasDecoration) {
-    auto bg = std::make_unique<Box>();
+    auto bg = ui::box({});
     bg->setPanelStyle(m_config->config().shell.panel.borders);
     bg->setFill(colorSpecFromRole(ColorRole::Surface, backgroundOpacity));
     instance.bgNode = static_cast<Box*>(instance.sceneRoot->addChild(std::move(bg)));
   }
 
-  auto contentWrapper = std::make_unique<Node>();
+  auto contentWrapper = ui::node({});
   instance.contentNode = contentWrapper.get();
   instance.panel->setAnimationManager(&instance.animations);
   instance.panel->setPanelCardOpacity(shell::panel_surface::cardOpacity(m_config, backgroundOpacity));
@@ -401,9 +402,9 @@ void PersistentPanelHost::layoutScene(Instance& instance, std::uint32_t width, s
     instance.bgNode->setSize(panelW, panelH);
   }
 
-  const float padding = instance.panel->hasDecoration() ? instance.panel->contentScale() * Style::panelPadding : 0.0f;
-  const float contentWidth = panelW - padding * 2.0f;
-  const float contentHeight = panelH - padding * 2.0f;
+  const float padding = instance.panel->hasDecoration() ? instance.panel->contentScale() * Style::panelPadding : 0.0F;
+  const float contentWidth = panelW - padding * 2.0F;
+  const float contentHeight = panelH - padding * 2.0F;
   {
     UiPhaseScope updatePhase(UiPhase::Update);
     instance.panel->update(*m_renderContext);
@@ -562,6 +563,14 @@ void PersistentPanelHost::refreshPanel(std::string_view id) {
     return;
   }
   instance->surface->requestUpdate();
+}
+
+void PersistentPanelHost::requestAnimationFrame(std::string_view id) {
+  Instance* instance = findInstance(id);
+  if (instance == nullptr || instance->surface == nullptr) {
+    return;
+  }
+  instance->surface->requestRedraw();
 }
 
 void PersistentPanelHost::onConfigReloaded() {

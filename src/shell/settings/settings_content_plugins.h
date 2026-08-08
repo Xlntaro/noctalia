@@ -21,7 +21,7 @@ namespace settings {
   // Data + actions for the Plugins settings section. Populated by SettingsWindow
   // from the PluginManager; the section is fully custom (no registry entries).
   struct SettingsPluginsContext {
-    float scale = 1.0f;
+    float scale = 1.0F;
     std::string_view selectedSection;
     std::vector<scripting::PluginStatus> plugins;
     std::vector<PluginSourceConfig> sources;
@@ -58,6 +58,9 @@ namespace settings {
 
   // Render the Plugins section into `content` when ctx.selectedSection == "plugins".
   void addSettingsPlugins(Flex& content, SettingsPluginsContext ctx);
+
+  // True when the plugin exposes anything the settings editor can show.
+  [[nodiscard]] bool pluginHasSettings(const scripting::PluginManifest& manifest);
 
   void buildPluginSettingsEditor(
       Flex& body, const Config& cfg, SettingsControlFactory& factory, const std::string& pluginId,

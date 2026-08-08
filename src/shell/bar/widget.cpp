@@ -7,15 +7,16 @@
 #include "render/scene/node.h"
 #include "shell/bar/widget_action_dispatcher.h"
 #include "shell/bar/widget_gesture_defaults.h"
+#include "ui/builders.h"
 #include "ui/palette.h"
+#include "util/string_utils.h"
 
 #include <algorithm>
-#include <array>
 #include <format>
 
 namespace {
 
-  constexpr float kCapsuleInkEpsilon = 0.5f;
+  constexpr float kCapsuleInkEpsilon = 0.5F;
   constexpr Logger kLog("bar.actions");
 
 } // namespace
@@ -67,11 +68,11 @@ bool Widget::shouldShowBarCapsule() const {
 }
 
 float Widget::resolvedBarCapsuleRadius(float width, float height) const noexcept {
-  const float maxRadius = std::max(0.0f, std::min(width, height) * 0.5f);
+  const float maxRadius = std::max(0.0F, std::min(width, height) * 0.5F);
   if (!m_barCapsuleSpec.radius.has_value()) {
     return maxRadius;
   }
-  return std::clamp(*m_barCapsuleSpec.radius * m_contentScale, 0.0f, maxRadius);
+  return std::clamp(*m_barCapsuleSpec.radius * m_contentScale, 0.0F, maxRadius);
 }
 
 void Widget::setBarCapsuleScene(Node* shell, Box* box) noexcept {
@@ -81,10 +82,22 @@ void Widget::setBarCapsuleScene(Node* shell, Box* box) noexcept {
 
 void Widget::setNonInteractive(bool nonInteractive) noexcept {
   m_nonInteractive = nonInteractive;
-  if (Node* outer = outerNode(); outer != nullptr) {
-    outer->setHitTestVisible(!m_nonInteractive);
-  }
+  syncOuterHitTestVisible();
   updateGestureAreaEnabled();
+}
+
+void Widget::setBarPointerSuppressed(bool suppressed) noexcept {
+  if (m_barPointerSuppressed == suppressed) {
+    return;
+  }
+  m_barPointerSuppressed = suppressed;
+  syncOuterHitTestVisible();
+}
+
+void Widget::syncOuterHitTestVisible() noexcept {
+  if (Node* outer = outerNode(); outer != nullptr) {
+    outer->setHitTestVisible(!m_nonInteractive && !m_barPointerSuppressed);
+  }
 }
 
 void Widget::updateGestureAreaEnabled() noexcept {
@@ -93,9 +106,9 @@ void Widget::updateGestureAreaEnabled() noexcept {
   }
 }
 
-float Widget::width() const noexcept { return outerNode() != nullptr ? outerNode()->width() : 0.0f; }
+float Widget::width() const noexcept { return outerNode() != nullptr ? outerNode()->width() : 0.0F; }
 
-float Widget::height() const noexcept { return outerNode() != nullptr ? outerNode()->height() : 0.0f; }
+float Widget::height() const noexcept { return outerNode() != nullptr ? outerNode()->height() : 0.0F; }
 
 std::unique_ptr<Node> Widget::releaseRoot() {
   m_outerPtr = m_outer.get();
@@ -108,7 +121,7 @@ void Widget::setRoot(std::unique_ptr<Node> root) {
   m_innerBaseButtons = m_innerArea != nullptr ? m_innerArea->acceptedButtons() : 0;
   m_innerBaseScrollDirections = m_innerArea != nullptr ? m_innerArea->acceptedScrollDirections() : 0;
 
-  auto gestureArea = std::make_unique<InputArea>();
+  auto gestureArea = ui::inputArea({});
   m_gestureArea = gestureArea.get();
   // Nothing is bound until resolveGestureBindings() runs, and an area with no accepted buttons
   // never wins the dispatcher's ancestor walk.
@@ -118,7 +131,7 @@ void Widget::setRoot(std::unique_ptr<Node> root) {
   }
 
   m_outer = std::move(gestureArea);
-  m_outer->setHitTestVisible(!m_nonInteractive);
+  m_outer->setHitTestVisible(!m_nonInteractive && !m_barPointerSuppressed);
   // Bindings are resolved before create() runs, so install them here too: whichever of the two
   // happens last is the one that wires the area up.
   installGestureHandlers();
@@ -171,6 +184,29 @@ void Widget::requestPanelToggle(
 ) {
   if (m_panelToggleCallback) {
     m_panelToggleCallback(panelId, context, anchorSurfaceX, anchorSurfaceY, activation);
+  }
+}
+
+void Widget::applyCommonOptions(
+    const CommonWidgetOptions& options, FontWeight barFontWeight, const std::string& barFontFamily,
+    std::string_view logContext
+) {
+  setAnchor(options.anchor);
+  setNonInteractive(!options.interactive);
+  m_labelFontWeight =
+      options.labelFontWeight.has_value() ? static_cast<FontWeight>(*options.labelFontWeight) : barFontWeight;
+  std::string labelFontFamily = StringUtils::trim(options.labelFontFamily);
+  if (labelFontFamily.empty()) {
+    m_labelFontFamily = barFontFamily;
+  } else {
+    m_labelFontFamily = std::move(labelFontFamily);
+  }
+
+  m_scrollRepeatMode = noctalia::bar::ScrollRepeatMode::Auto;
+  if (const auto mode = noctalia::bar::parseScrollRepeatMode(options.scrollRepeat); mode.has_value()) {
+    m_scrollRepeatMode = *mode;
+  } else {
+    kLog.error("{}.scroll_repeat: unknown mode \"{}\"", logContext, options.scrollRepeat);
   }
 }
 
@@ -271,18 +307,17 @@ void Widget::installGestureHandlers() {
       return m_gestureBindings.find(noctalia::bar::Gesture::ScrollUp) != nullptr
           || m_gestureBindings.find(noctalia::bar::Gesture::ScrollDown) != nullptr;
     }
-    if (!data.scrollStepStartsGesture() && bindingCycles(*gesture)) {
-      // A verb that steps along a list moves one position per flick, so the rest of the burst is
-      // swallowed rather than skipping several entries. Ramp verbs take every notch.
+    if (!data.scrollStepStartsGesture() && !bindingRepeatsEveryScrollStep(*gesture)) {
       return true;
     }
     return dispatchGesture(*gesture);
   });
 }
 
-bool Widget::bindingCycles(noctalia::bar::Gesture gesture) const {
+bool Widget::bindingRepeatsEveryScrollStep(noctalia::bar::Gesture gesture) const {
   const auto* action = m_gestureBindings.find(gesture);
-  return action != nullptr && m_actionDispatcher != nullptr && m_actionDispatcher->cycles(*action);
+  const bool actionCycles = action != nullptr && m_actionDispatcher != nullptr && m_actionDispatcher->cycles(*action);
+  return noctalia::bar::scrollRepeatsEveryStep(m_scrollRepeatMode, actionCycles);
 }
 
 bool Widget::dispatchGesture(noctalia::bar::Gesture gesture) {

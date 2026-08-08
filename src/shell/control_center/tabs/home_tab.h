@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config/config_types.h"
 #include "core/timer_manager.h"
 #include "render/core/thumbnail_service.h"
 #include "shell/control_center/control_center_services.h"
@@ -35,6 +36,7 @@ namespace scripting {
 }
 
 struct ShortcutPad {
+  // Survives HomeTab::onClose(); button/glyph/label are nulled with the scene.
   std::unique_ptr<Shortcut> shortcut;
   Button* button = nullptr;
   Glyph* glyph = nullptr;
@@ -79,6 +81,7 @@ private:
   void warnOnOversizedAvatarSource(const std::string& path);
   void syncScaledFonts();
   void syncShortcuts();
+  void syncHeaderActions();
   bool resizeMediaArtToCard();
   void onPanelCardOpacityChanged(float opacity) override;
 
@@ -158,4 +161,7 @@ private:
 
   GridView* m_shortcutsGrid = nullptr;
   std::vector<ShortcutPad> m_shortcutPads;
+  // Plugin config as of the last shortcut grid build. A plugin shortcut seeds its Luau
+  // runtime at construction, so a change here must block instance reuse.
+  PluginsConfig m_lastPlugins;
 };

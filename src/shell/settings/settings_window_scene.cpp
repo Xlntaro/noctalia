@@ -100,7 +100,7 @@ namespace {
   }
 
   std::unique_ptr<Flex> centeredRow(std::unique_ptr<Flex> child) {
-    child->setFlexGrow(1.0f);
+    child->setFlexGrow(1.0F);
     return ui::row(
         {
             .align = FlexAlign::Stretch,
@@ -577,7 +577,7 @@ namespace {
 
   void logSettingsProfile(std::string_view label, const SettingsProfileWatch& watch) {
     if (watch.active()) {
-      kLog.info("profile {}: {:.1f}ms", label, watch.elapsedMs());
+      kLog.info("profile {}: {:.1F}ms", label, watch.elapsedMs());
     }
   }
 
@@ -794,6 +794,7 @@ settings::RegistryEnvironment SettingsWindow::buildRegistryEnvironment() const {
       );
     }
   }
+  env.keyboardLayoutNames = m_wayland != nullptr ? m_wayland->keyboardLayoutNames() : std::vector<std::string>{};
   if (m_wayland != nullptr) {
     for (const auto& output : m_wayland->outputs()) {
       if (output.output == nullptr || output.connectorName.empty()) {
@@ -838,7 +839,7 @@ std::vector<settings::GestureActionOption> SettingsWindow::gestureActionCatalog(
     if (handler.command == noctalia::bar::kExecVerb || handler.command == noctalia::bar::kNoneVerb) {
       continue;
     }
-    if (!handler.bindable) {
+    if (handler.actionEditorVisibility == IpcService::ActionEditorVisibility::Hidden) {
       continue;
     }
     options.push_back(
@@ -860,7 +861,7 @@ std::vector<settings::GestureActionOption> SettingsWindow::gestureActionCatalog(
 settings::SettingsContentContext SettingsWindow::makeContentContext(
     const Config& cfg, const BarConfig* selectedBar, const BarMonitorOverride* selectedMonitorOverride
 ) {
-  const auto requestRebuild = [this]() { requestSceneRebuild(); };
+  const auto requestRebuild = [this]() { requestContentRebuild(/*refreshRegistry=*/true, /*refreshFilterRow=*/true); };
   const auto requestContent = [this]() { requestContentRebuild(); };
   const auto setOverride = [this](std::vector<std::string> path, ConfigOverrideValue value) {
     setSettingOverride(std::move(path), std::move(value));
@@ -872,6 +873,7 @@ settings::SettingsContentContext SettingsWindow::makeContentContext(
   const auto clearOverrides = [this](std::vector<std::vector<std::string>> paths) {
     clearSettingOverrides(std::move(paths));
   };
+  const auto resetLane = [this](std::vector<std::string> lanePath) { resetBarLane(std::move(lanePath)); };
   const auto renameWidget = [this](
                                 std::string oldName, std::string newName,
                                 std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> referenceOverrides
@@ -890,7 +892,6 @@ settings::SettingsContentContext SettingsWindow::makeContentContext(
       .showAdvanced = m_showAdvanced,
       .showOverriddenOnly = m_showOverriddenOnly,
       .batteryDeviceOptions = batteryDeviceOptions(),
-      .keyboardLayoutNames = m_wayland != nullptr ? m_wayland->keyboardLayoutNames() : std::vector<std::string>{},
       .editingWidgetName = m_editingWidgetName,
       .editingCapsuleGroupId = m_editingCapsuleGroupId,
       .selectedLaneWidgets = m_selectedLaneWidgets,
@@ -903,7 +904,7 @@ settings::SettingsContentContext SettingsWindow::makeContentContext(
       .actionCatalog = gestureActionCatalog(),
       .requestRebuild = requestRebuild,
       .requestContentRebuild = requestContent,
-      .resetContentScroll = [this]() { m_contentScrollState.offset = 0.0f; },
+      .resetContentScroll = [this]() { m_contentScrollState.offset = 0.0F; },
       .setScrollTarget = [this](Node* target) { m_pendingContentScrollTarget = target; },
       .focusArea = [this](InputArea* area) { m_inputDispatcher.setFocus(area); },
       .openBarWidgetAddPopup = [this](const std::vector<std::string>& lanePath) { openBarWidgetAddPopup(lanePath); },
@@ -913,6 +914,7 @@ settings::SettingsContentContext SettingsWindow::makeContentContext(
       .setOverrides = setOverrides,
       .clearOverride = clearOverride,
       .clearOverrides = clearOverrides,
+      .resetBarLane = resetLane,
       .isResetConfirmationPending =
           [this](const std::vector<std::vector<std::string>>& paths) { return m_pendingResetSettingPaths == paths; },
       .requestResetConfirmation =
@@ -1016,7 +1018,7 @@ void SettingsWindow::rebuildSettingsContent() {
           .renamingMonitorOverrideMatch = m_renamingMonitorOverrideMatch,
           .pendingDeleteMonitorOverrideBarName = m_pendingDeleteMonitorOverrideBarName,
           .pendingDeleteMonitorOverrideMatch = m_pendingDeleteMonitorOverrideMatch,
-          .requestRebuild = [this]() { requestSceneRebuild(); },
+          .requestRebuild = [this]() { requestContentRebuild(/*refreshRegistry=*/true, /*refreshFilterRow=*/true); },
           .renameBar =
               [this](std::string oldName, std::string newName) { renameBar(std::move(oldName), std::move(newName)); },
           .deleteBar = [this](std::string name) { deleteBar(std::move(name)); },
@@ -1131,7 +1133,7 @@ std::unique_ptr<Flex> SettingsWindow::buildHeaderRow(float scale) {
           .fontSize = Style::fontSizeTitle * scale,
           .fontWeight = FontWeight::Bold,
           .color = colorSpecFromRole(ColorRole::OnSurface),
-          .flexGrow = 1.0f,
+          .flexGrow = 1.0F,
       }),
       ui::button({
           .out = &m_actionsMenuButton,
@@ -1183,7 +1185,7 @@ std::unique_ptr<Flex> SettingsWindow::buildFilterRow(
           .controlHeight = Style::controlHeight * scale,
           .horizontalPadding = Style::spaceSm * scale,
           .clearButtonEnabled = true,
-          .width = 320.0f * scale,
+          .width = 320.0F * scale,
           .height = Style::controlHeight * scale,
           .onChange = [this](const std::string& value) {
             const bool wasSearchActive = !m_searchQuery.empty();
@@ -1299,12 +1301,12 @@ std::unique_ptr<Flex> SettingsWindow::buildFilterRow(
             .paddingV = Style::spaceXs * scale,
             .paddingH = Style::spaceSm * scale,
             .radius = Style::scaledRadiusMd(scale),
-            .onClick = [this, resetPageScope, resetPagePaths = std::move(resetPagePaths), requestRebuild,
-                        clearOverrides, pendingReset]() mutable {
+            .onClick = [this, resetPageScope, resetPagePaths = std::move(resetPagePaths), clearOverrides,
+                        pendingReset]() mutable {
               if (!pendingReset) {
                 m_pendingResetSettingPaths.clear();
                 m_pendingResetPageScope = resetPageScope;
-                requestRebuild();
+                requestContentRebuild(/*refreshRegistry=*/false, /*refreshFilterRow=*/true);
                 return;
               }
               clearOverrides(std::move(resetPagePaths));
@@ -1392,9 +1394,9 @@ std::unique_ptr<Flex> SettingsWindow::buildBody(
       .out = &m_contentScrollView,
       .state = &m_contentScrollState,
       .scrollbarVisible = true,
-      .viewportPaddingH = 0.0f,
+      .viewportPaddingH = 0.0F,
       .viewportPaddingV = Style::spaceSm * scale,
-      .flexGrow = 1.0f,
+      .flexGrow = 1.0F,
       .onScrollChanged = [this](float /*offset*/) { dismissOpenSelectDropdown(); },
       .configure =
           [](ScrollView& scrollView) {
@@ -1423,6 +1425,15 @@ void SettingsWindow::refreshSettingsRegistry(const Config& cfg) {
   m_settingsRegistry = settings::buildSettingsRegistry(cfg, nullptr, nullptr, env);
   logSettingsProfile("refreshRegistry registry", phaseProfileWatch);
   phaseProfileWatch.reset();
+
+  for (auto& entry : m_settingsRegistry) {
+    if (entry.section != settings::SettingsSection::Templates || entry.group != "community") {
+      continue;
+    }
+    if (auto* button = std::get_if<settings::ButtonSetting>(&entry.control)) {
+      button->action = [this]() { openCommunityTemplateStore(); };
+    }
+  }
 
   if (m_calendarService != nullptr
       && (m_calendarService->credentialMigrationPending()
@@ -1863,17 +1874,26 @@ void SettingsWindow::refreshSettingsRegistry(const Config& cfg) {
       if (account.type != "google" && account.type != "caldav") {
         continue;
       }
+      const bool reconnectRequired = account.type == "google"
+          && m_calendarService != nullptr
+          && m_calendarService->googleAccountNeedsReconnect(account.id);
       settings::SettingEntry btn{
           .section = settings::SettingsSection::Services,
           .group = "calendar",
           .title = account.displayName.empty() ? account.id : account.displayName,
-          .subtitle = i18n::tr("settings.schema.services.calendar-edit.description"),
+          .subtitle = i18n::tr(
+              reconnectRequired ? "settings.schema.services.calendar-edit.description-reconnect"
+                                : "settings.schema.services.calendar-edit.description"
+          ),
           .path = {},
           .control =
               settings::ButtonSetting{
-                  .label = i18n::tr("settings.schema.services.calendar-edit.button"),
+                  .label = i18n::tr(
+                      reconnectRequired ? "settings.schema.services.calendar-edit.button-reconnect"
+                                        : "settings.schema.services.calendar-edit.button"
+                  ),
                   .action = [this, id = account.id]() { openCalendarAccountEditor(id); },
-                  .glyph = "edit",
+                  .glyph = reconnectRequired ? "brand-google" : "edit",
               },
           .searchText = "calendar account edit connect authorize caldav icloud google password " + account.id,
           .visibleWhen = calendarOn,
@@ -2030,7 +2050,7 @@ void SettingsWindow::buildScene(std::uint32_t width, std::uint32_t height) {
   m_filterRow = nullptr;
   m_panelBackground = nullptr;
   m_contentContainer = nullptr;
-  m_sceneRoot = std::make_unique<Node>();
+  m_sceneRoot = ui::node({});
   m_sceneRoot->setSize(w, h);
   m_sceneRoot->setAnimationManager(&m_animations);
   if (m_surface != nullptr && m_renderContext != nullptr && m_wayland != nullptr) {
@@ -2040,14 +2060,17 @@ void SettingsWindow::buildScene(std::uint32_t width, std::uint32_t height) {
     m_sceneRoot->setPopupContext(m_selectPopup.get());
   }
 
+  const float bgOpacity = cfg.shell.settingsWindowTranslucent ? 0.75F : 1.0F;
+
   auto bg = ui::box({
       .width = w,
       .height = h,
-      .configure = [](Box& box) {
+      .configure = [bgOpacity](Box& box) {
         box.setPanelStyle();
-        box.setRadius(0.0f);
+        box.setRadius(0.0F);
         box.setBorder(clearColor(), 0);
-        box.setPosition(0.0f, 0.0f);
+        box.setPosition(0.0F, 0.0F);
+        box.setFill(colorSpecFromRole(ColorRole::Surface, bgOpacity));
       },
   });
   m_panelBackground = static_cast<Box*>(m_sceneRoot->addChild(std::move(bg)));
@@ -2072,7 +2095,7 @@ void SettingsWindow::buildScene(std::uint32_t width, std::uint32_t height) {
   phaseProfileWatch.reset();
 
   auto bodyRow = centeredRow(buildBody(scale, cfg, sections, availableBars));
-  bodyRow->setFlexGrow(1.0f);
+  bodyRow->setFlexGrow(1.0F);
   main->addChild(std::move(bodyRow));
   logSettingsProfile("buildScene body", phaseProfileWatch);
   phaseProfileWatch.reset();

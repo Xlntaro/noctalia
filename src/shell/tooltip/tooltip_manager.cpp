@@ -22,44 +22,54 @@ namespace {
   constexpr Logger kLog("tooltip");
 
   constexpr auto kShowDelay = std::chrono::milliseconds(500);
-  constexpr float kMaxContentWidth = 280.0f;
+  constexpr float kMaxContentWidth = 280.0F;
   constexpr int kMaxTextLines = 3;
-  constexpr float kTableMinPeerColumnWidth = 80.0f;
+  constexpr float kTableMinPeerColumnWidth = 80.0F;
   constexpr float kPadH = Style::spaceMd;
   constexpr float kPadV = Style::spaceSm;
   constexpr float kTableGap = Style::spaceXs;
   constexpr float kTableColumnGap = Style::spaceMd;
   constexpr float kBorder = Style::borderWidth;
 
+  std::unique_ptr<Label> makeTooltipTextLabel(std::string_view text, float fontSize, float maxWidth) {
+    return ui::label({
+        .text = std::string(text),
+        .fontSize = fontSize,
+        .color = colorSpecFromRole(ColorRole::OnSurface),
+        .maxWidth = maxWidth,
+        .maxLines = kMaxTextLines,
+    });
+  }
+
   struct TableColumnWidths {
-    float key = 0.0f;
-    float value = 0.0f;
+    float key = 0.0F;
+    float value = 0.0F;
   };
 
   TableColumnWidths fitTableColumns(float naturalKeyW, float naturalValueW) {
-    const float availableW = std::max(0.0f, kMaxContentWidth - kTableColumnGap);
-    if (availableW <= 0.0f) {
+    const float availableW = std::max(0.0F, kMaxContentWidth - kTableColumnGap);
+    if (availableW <= 0.0F) {
       return {};
     }
 
-    const float halfW = availableW * 0.5f;
+    const float halfW = availableW * 0.5F;
     const float peerReserveW = std::min(kTableMinPeerColumnWidth, halfW);
-    const float columnMaxW = std::max(0.0f, availableW - peerReserveW);
+    const float columnMaxW = std::max(0.0F, availableW - peerReserveW);
 
     TableColumnWidths widths{
         .key = std::min(naturalKeyW, halfW),
         .value = std::min(naturalValueW, halfW),
     };
 
-    float remainingW = std::max(0.0f, availableW - widths.key - widths.value);
-    if (remainingW <= 0.0f) {
+    float remainingW = std::max(0.0F, availableW - widths.key - widths.value);
+    if (remainingW <= 0.0F) {
       return widths;
     }
 
-    float keyNeed = std::max(0.0f, std::min(naturalKeyW, columnMaxW) - widths.key);
-    float valueNeed = std::max(0.0f, std::min(naturalValueW, columnMaxW) - widths.value);
+    float keyNeed = std::max(0.0F, std::min(naturalKeyW, columnMaxW) - widths.key);
+    float valueNeed = std::max(0.0F, std::min(naturalValueW, columnMaxW) - widths.value);
     const float totalNeed = keyNeed + valueNeed;
-    if (totalNeed <= 0.0f) {
+    if (totalNeed <= 0.0F) {
       return widths;
     }
 
@@ -72,7 +82,7 @@ namespace {
     widths.value += valueDelta;
     remainingW -= valueDelta;
 
-    if (remainingW > 0.0f && keyNeed > 0.0f) {
+    if (remainingW > 0.0F && keyNeed > 0.0F) {
       widths.key += std::min(keyNeed, remainingW);
     }
 
@@ -82,8 +92,8 @@ namespace {
   PopupSurfaceConfig buildTooltipAnchorConfig(const InputArea* area) {
     const Node* anchorNode = area->tooltipAnchorNode();
     const Node* boundsNode = anchorNode != nullptr ? anchorNode : area;
-    float absX = 0.0f;
-    float absY = 0.0f;
+    float absX = 0.0F;
+    float absY = 0.0F;
     Node::absolutePosition(boundsNode, absX, absY);
 
     TooltipAnchorInsets inset{};
@@ -92,8 +102,8 @@ namespace {
     }
     const float iconX = absX + inset.left;
     const float iconY = absY + inset.top;
-    const float iconW = std::max(1.0f, boundsNode->width() - inset.left - inset.right);
-    const float iconH = std::max(1.0f, boundsNode->height() - inset.top - inset.bottom);
+    const float iconW = std::max(1.0F, boundsNode->width() - inset.left - inset.right);
+    const float iconH = std::max(1.0F, boundsNode->height() - inset.top - inset.bottom);
 
     const auto gap = static_cast<std::int32_t>(std::lround(Style::spaceSm));
 
@@ -113,7 +123,7 @@ namespace {
       anchorX = iconX;
       anchorY = iconY;
       anchorW = iconW;
-      anchorH = 1.0f;
+      anchorH = 1.0F;
       anchor = XDG_POSITIONER_ANCHOR_TOP;
       gravity = XDG_POSITIONER_GRAVITY_TOP;
       offsetY = -gap;
@@ -123,7 +133,7 @@ namespace {
       anchorX = iconX;
       anchorY = iconY + iconH;
       anchorW = iconW;
-      anchorH = 1.0f;
+      anchorH = 1.0F;
       anchor = XDG_POSITIONER_ANCHOR_BOTTOM;
       gravity = XDG_POSITIONER_GRAVITY_BOTTOM;
       offsetY = gap;
@@ -132,7 +142,7 @@ namespace {
     case TooltipPlacement::Left:
       anchorX = iconX;
       anchorY = iconY;
-      anchorW = 1.0f;
+      anchorW = 1.0F;
       anchorH = iconH;
       anchor = XDG_POSITIONER_ANCHOR_LEFT;
       gravity = XDG_POSITIONER_GRAVITY_LEFT;
@@ -142,7 +152,7 @@ namespace {
     case TooltipPlacement::Right:
       anchorX = iconX + iconW;
       anchorY = iconY;
-      anchorW = 1.0f;
+      anchorW = 1.0F;
       anchorH = iconH;
       anchor = XDG_POSITIONER_ANCHOR_RIGHT;
       gravity = XDG_POSITIONER_GRAVITY_RIGHT;
@@ -429,7 +439,7 @@ void TooltipManager::dismissPopup() {
       m_animations.cancel(m_fadeAnimId);
     }
     m_fadeAnimId = m_animations.animate(
-        m_sceneRoot->opacity(), 0.0f, Style::animFast, Easing::EaseOutQuad,
+        m_sceneRoot->opacity(), 0.0F, Style::animFast, Easing::EaseOutQuad,
         [this](float v) {
           if (m_sceneRoot != nullptr) {
             m_sceneRoot->setOpacity(v);
@@ -526,6 +536,9 @@ void TooltipManager::refreshPopupContent() {
     return;
   }
 
+  m_renderContext->makeCurrent(m_surface->renderTarget());
+  m_renderContext->syncContentScale(m_surface->renderTarget());
+
   const auto [contentW, contentH] = measureContent(m_pendingContent);
   if (contentW == 0 || contentH == 0) {
     dismissPopup();
@@ -542,11 +555,10 @@ void TooltipManager::refreshPopupContent() {
   m_surface->resize(contentW, contentH, false);
   m_surface->repositionAnchor(anchorConfig, false);
 
-  m_renderContext->makeCurrent(m_surface->renderTarget());
   m_sceneRoot.reset();
   {
     UiPhaseScope layoutPhase(UiPhase::Layout);
-    buildScene(m_pendingContent, static_cast<float>(contentW), static_cast<float>(contentH), 1.0f);
+    buildScene(m_pendingContent, static_cast<float>(contentW), static_cast<float>(contentH), 1.0F);
   }
   m_surface->requestRedraw();
 }
@@ -571,7 +583,7 @@ TooltipManager::Size TooltipManager::measureContent(const TooltipContent& conten
     return {};
   }
 
-  const float scale = (m_config != nullptr) ? std::max(0.1f, m_config->config().accessibility.uiScale) : 1.0f;
+  const float scale = (m_config != nullptr) ? std::max(0.1F, m_config->config().accessibility.uiScale) : 1.0F;
   const float maxContentWidth = kMaxContentWidth * scale;
   const float fontSize = Style::fontSizeCaption * scale;
   const float padH = kPadH * scale;
@@ -580,9 +592,10 @@ TooltipManager::Size TooltipManager::measureContent(const TooltipContent& conten
   const float tableColumnGap = kTableColumnGap * scale;
 
   if (const auto* text = std::get_if<std::string>(&content)) {
-    auto metrics = m_renderContext->measureText(*text, fontSize, FontWeight::Normal, maxContentWidth, kMaxTextLines);
-    auto w = static_cast<std::uint32_t>(std::ceil(metrics.width + padH * 2.0f + kBorder * 2.0f));
-    auto h = static_cast<std::uint32_t>(std::ceil((metrics.bottom - metrics.top) + padV * 2.0f + kBorder * 2.0f));
+    auto label = makeTooltipTextLabel(*text, fontSize, maxContentWidth);
+    label->measure(*m_renderContext);
+    auto w = static_cast<std::uint32_t>(std::ceil(label->width() + padH * 2.0F + kBorder * 2.0F));
+    auto h = static_cast<std::uint32_t>(std::ceil(label->height() + padV * 2.0F + kBorder * 2.0F));
     return {std::max(w, 1U), std::max(h, 1U)};
   }
 
@@ -590,9 +603,9 @@ TooltipManager::Size TooltipManager::measureContent(const TooltipContent& conten
     if (rows->empty()) {
       return {};
     }
-    float maxKeyW = 0.0f;
-    float maxValW = 0.0f;
-    float rowH = 0.0f;
+    float maxKeyW = 0.0F;
+    float maxValW = 0.0F;
+    float rowH = 0.0F;
     for (const auto& row : *rows) {
       auto km = m_renderContext->measureText(row.key, fontSize);
       const auto vm = m_renderContext->measureText(row.value, fontSize);
@@ -603,8 +616,8 @@ TooltipManager::Size TooltipManager::measureContent(const TooltipContent& conten
     const TableColumnWidths columns = fitTableColumns(maxKeyW, maxValW);
     float contentW = columns.key + tableColumnGap + columns.value;
     float contentH = static_cast<float>(rows->size()) * rowH + static_cast<float>(rows->size() - 1) * tableGap;
-    auto w = static_cast<std::uint32_t>(std::ceil(contentW + padH * 2.0f + kBorder * 2.0f));
-    auto h = static_cast<std::uint32_t>(std::ceil(contentH + padV * 2.0f + kBorder * 2.0f));
+    auto w = static_cast<std::uint32_t>(std::ceil(contentW + padH * 2.0F + kBorder * 2.0F));
+    auto h = static_cast<std::uint32_t>(std::ceil(contentH + padV * 2.0F + kBorder * 2.0F));
     return {std::max(w, 1U), std::max(h, 1U)};
   }
 
@@ -617,7 +630,7 @@ void TooltipManager::buildScene(const TooltipContent& content, float w, float h,
     return;
   }
 
-  m_sceneRoot = std::make_unique<Node>();
+  m_sceneRoot = ui::node({});
   m_sceneRoot->setSize(w, h);
   m_sceneRoot->setOpacity(opacity);
   m_sceneRoot->setHitTestVisible(false);
@@ -633,7 +646,7 @@ void TooltipManager::buildScene(const TooltipContent& content, float w, float h,
       })
   );
 
-  const float scale = (m_config != nullptr) ? std::max(0.1f, m_config->config().accessibility.uiScale) : 1.0f;
+  const float scale = (m_config != nullptr) ? std::max(0.1F, m_config->config().accessibility.uiScale) : 1.0F;
   const float maxContentWidth = kMaxContentWidth * scale;
   const float fontSize = Style::fontSizeCaption * scale;
   const float padH = kPadH * scale;
@@ -642,13 +655,7 @@ void TooltipManager::buildScene(const TooltipContent& content, float w, float h,
   const float tableColumnGap = kTableColumnGap * scale;
 
   if (const auto* text = std::get_if<std::string>(&content)) {
-    auto label = ui::label({
-        .text = *text,
-        .fontSize = fontSize,
-        .color = colorSpecFromRole(ColorRole::OnSurface),
-        .maxWidth = maxContentWidth,
-        .maxLines = kMaxTextLines,
-    });
+    auto label = makeTooltipTextLabel(*text, fontSize, maxContentWidth);
     label->measure(*m_renderContext);
     label->setPosition(padH + kBorder, padV + kBorder);
     m_sceneRoot->addChild(std::move(label));
@@ -656,10 +663,10 @@ void TooltipManager::buildScene(const TooltipContent& content, float w, float h,
   }
 
   if (const auto* rows = std::get_if<std::vector<TooltipRow>>(&content)) {
-    const float containerW = w - (padH + kBorder) * 2.0f;
+    const float containerW = w - (padH + kBorder) * 2.0F;
 
-    float maxKeyW = 0.0f;
-    float maxValW = 0.0f;
+    float maxKeyW = 0.0F;
+    float maxValW = 0.0F;
     for (const auto& row : *rows) {
       auto km = m_renderContext->measureText(row.key, fontSize);
       const auto vm = m_renderContext->measureText(row.value, fontSize);
@@ -671,7 +678,7 @@ void TooltipManager::buildScene(const TooltipContent& content, float w, float h,
     auto container = ui::column({
         .gap = tableGap,
         .width = containerW,
-        .height = h - (padV + kBorder) * 2.0f,
+        .height = h - (padV + kBorder) * 2.0F,
         .configure = [padH, padV](Flex& flex) { flex.setPosition(padH + kBorder, padV + kBorder); },
     });
 
@@ -683,7 +690,7 @@ void TooltipManager::buildScene(const TooltipContent& content, float w, float h,
           .maxLines = 1,
       });
       const auto km = m_renderContext->measureText(row.key, fontSize);
-      if (km.width > columns.key + 0.5f) {
+      if (km.width > columns.key + 0.5F) {
         keyLabel->setMaxWidth(columns.key);
       }
       keyLabel->measure(*m_renderContext);
@@ -697,7 +704,7 @@ void TooltipManager::buildScene(const TooltipContent& content, float w, float h,
           .ellipsize = row.valueEllipsize,
       });
       const auto vm = m_renderContext->measureText(row.value, fontSize);
-      if (vm.width > columns.value + 0.5f) {
+      if (vm.width > columns.value + 0.5F) {
         valLabel->setMaxWidth(columns.value);
       }
       valLabel->measure(*m_renderContext);
@@ -731,6 +738,7 @@ void TooltipManager::prepareFrame(bool /*needsUpdate*/, bool /*needsLayout*/) {
   }
 
   m_renderContext->makeCurrent(m_surface->renderTarget());
+  m_renderContext->syncContentScale(m_surface->renderTarget());
 
   const auto w = static_cast<float>(width);
   const auto h = static_cast<float>(height);
@@ -743,7 +751,7 @@ void TooltipManager::prepareFrame(bool /*needsUpdate*/, bool /*needsLayout*/) {
       m_animations.cancel(m_fadeAnimId);
     }
     m_fadeAnimId = m_animations.animate(
-        0.0f, 1.0f, Style::animFast, Easing::EaseOutQuad,
+        0.0F, 1.0F, Style::animFast, Easing::EaseOutQuad,
         [this](float v) {
           if (m_sceneRoot != nullptr) {
             m_sceneRoot->setOpacity(v);

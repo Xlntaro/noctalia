@@ -18,8 +18,6 @@ public:
     bool showWhenIdle = false;
     ColorSpec color1 = colorSpecFromRole(ColorRole::Primary);
     ColorSpec color2 = colorSpecFromRole(ColorRole::Primary);
-
-    bool operator==(const Options&) const = default;
   };
 
   AudioVisualizerWidget(PipeWireSpectrum* spectrum, Options options);
@@ -40,7 +38,7 @@ private:
   void startOpacityAnimation(float targetOpacity, bool collapseOnComplete);
 
   PipeWireSpectrum* m_spectrum = nullptr;
-  float m_width = 56.0f;
+  float m_width = 56.0F;
   int m_bands = 16;
   bool m_mirrored = false;
   bool m_centered = true;

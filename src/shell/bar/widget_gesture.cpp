@@ -60,6 +60,31 @@ namespace noctalia::bar {
     return it->gesture;
   }
 
+  std::optional<ScrollRepeatMode> parseScrollRepeatMode(std::string_view value) noexcept {
+    if (value == "auto") {
+      return ScrollRepeatMode::Auto;
+    }
+    if (value == "gesture") {
+      return ScrollRepeatMode::Gesture;
+    }
+    if (value == "steps") {
+      return ScrollRepeatMode::Steps;
+    }
+    return std::nullopt;
+  }
+
+  bool scrollRepeatsEveryStep(ScrollRepeatMode mode, bool actionCycles) noexcept {
+    switch (mode) {
+    case ScrollRepeatMode::Auto:
+      return !actionCycles;
+    case ScrollRepeatMode::Gesture:
+      return false;
+    case ScrollRepeatMode::Steps:
+      return true;
+    }
+    return false;
+  }
+
   std::optional<Gesture> gestureForButton(std::uint32_t button) noexcept {
     switch (button) {
     case BTN_LEFT:
@@ -80,15 +105,15 @@ namespace noctalia::bar {
   }
 
   std::optional<Gesture> gestureForScroll(std::uint32_t axis, float steps) noexcept {
-    if (steps == 0.0f) {
+    if (steps == 0.0F) {
       return std::nullopt;
     }
     // Wayland reports up/left as a negative delta.
     if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL) {
-      return steps < 0.0f ? Gesture::ScrollUp : Gesture::ScrollDown;
+      return steps < 0.0F ? Gesture::ScrollUp : Gesture::ScrollDown;
     }
     if (axis == WL_POINTER_AXIS_HORIZONTAL_SCROLL) {
-      return steps < 0.0f ? Gesture::ScrollLeft : Gesture::ScrollRight;
+      return steps < 0.0F ? Gesture::ScrollLeft : Gesture::ScrollRight;
     }
     return std::nullopt;
   }

@@ -35,8 +35,6 @@ public:
     bool hideAlbumArt = false;
     bool hideArtist = false;
     bool artistFirst = false;
-
-    bool operator==(const Options&) const = default;
   };
 
   MediaWidget(MprisService* mpris, HttpClient* httpClient, wl_output* output, Options options);
@@ -53,9 +51,9 @@ private:
 
   MprisService* m_mpris = nullptr;
   HttpClient* m_httpClient = nullptr;
-  float m_maxWidth = 220.0f;
-  float m_minWidth = 80.0f;
-  float m_artSize = 16.0f;
+  float m_maxWidth = 220.0F;
+  float m_minWidth = 80.0F;
+  float m_artSize = 16.0F;
   MediaTitleScrollMode m_titleScrollMode = MediaTitleScrollMode::None;
   bool m_hideWhenNoMedia = false;
   bool m_albumArtOnly = false;

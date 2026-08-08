@@ -5,6 +5,7 @@
 #include "core/ui_phase.h"
 #include "render/render_context.h"
 #include "render/scene/node.h"
+#include "ui/builders.h"
 #include "ui/controls/box.h"
 #include "ui/palette.h"
 #include "wayland/wayland_connection.h"
@@ -198,7 +199,7 @@ void IdleGraceOverlay::prepareFrame(Instance& inst, bool needsUpdate, bool needs
   if ((needsUpdate || needsLayout || needsSceneBuild) && inst.sceneRoot != nullptr) {
     UiPhaseScope layoutPhase(UiPhase::Layout);
     if (inst.dim != nullptr) {
-      inst.dim->setPosition(0.0f, 0.0f);
+      inst.dim->setPosition(0.0F, 0.0F);
       inst.dim->setSize(static_cast<float>(width), static_cast<float>(height));
     }
     if (inst.pendingFadeIn.has_value()) {
@@ -218,17 +219,17 @@ void IdleGraceOverlay::buildScene(Instance& inst, std::uint32_t width, std::uint
   const auto w = static_cast<float>(width);
   const auto h = static_cast<float>(height);
 
-  inst.sceneRoot = std::make_unique<Node>();
+  inst.sceneRoot = ui::node({});
   inst.sceneRoot->setSize(w, h);
-  inst.sceneRoot->setOpacity(1.0f);
+  inst.sceneRoot->setOpacity(1.0F);
   inst.surface->setSceneRoot(inst.sceneRoot.get());
 
   // Fullscreen tint: fade this layer only so the Wayland buffer stays a proper overlay (transparent
   // clear + premultiplied tint).
-  auto dim = std::make_unique<Box>();
-  dim->setFill(fixedColorSpec(rgba(0.0f, 0.0f, 0.0f, 1.0f)));
-  dim->setOpacity(0.0f);
-  dim->setPosition(0.0f, 0.0f);
+  auto dim = ui::box({});
+  dim->setFill(fixedColorSpec(rgba(0.0F, 0.0F, 0.0F, 1.0F)));
+  dim->setOpacity(0.0F);
+  dim->setPosition(0.0F, 0.0F);
   dim->setSize(w, h);
   inst.dim = static_cast<Box*>(inst.sceneRoot->addChild(std::move(dim)));
 }
@@ -247,7 +248,7 @@ void IdleGraceOverlay::startFadeIn(Instance& inst, std::chrono::milliseconds fad
   Instance* instPtr = &inst;
   Box* dimPtr = inst.dim;
   inst.fadeAnimId = inst.animations.animate(
-      start, 1.0f, durationMs, Easing::EaseInOutCubic, [dimPtr](float v) { dimPtr->setOpacity(v); },
+      start, 1.0F, durationMs, Easing::EaseInOutCubic, [dimPtr](float v) { dimPtr->setOpacity(v); },
       [this, instPtr]() {
         instPtr->fadeAnimId = 0;
         onFadeInstanceComplete();

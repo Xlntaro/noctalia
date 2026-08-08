@@ -51,7 +51,7 @@ namespace {
   }
 
   desktop_entry_launch::LaunchOptions
-  dockLaunchOptions(const CompositorPlatform& platform, const ConfigService& config) {
+  dockLaunchOptions(const CompositorPlatform& platform, const ConfigService& config, const DesktopEntry& entry = {}) {
     std::string token;
     if (platform.hasXdgActivation()) {
       // No layer-shell surface — binding it can misplace first launches on Hyprland.
@@ -61,12 +61,14 @@ namespace {
         .activationToken = std::move(token),
         .runAsSystemdService = config.config().shell.launchAppsAsSystemdServices,
         .customCommand = config.config().shell.launchAppsCustomCommand,
+        .dbusActivatable = entry.dbusActivatable,
+        .dbusAppId = entry.id,
     };
   }
 
   template <typename T> void appendOptionalStackPart(std::string& out, const std::optional<T>& value) {
     out += value.has_value() ? std::format("{}", *value) : "-";
-    out.push_back('\x1f');
+    out.push_back('\x1F');
   }
 
   std::vector<std::string> barLayerStackSignature(const Config& config) {
@@ -75,14 +77,14 @@ namespace {
 
     for (const auto& bar : config.bars) {
       std::string item = std::format(
-          "{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}\x1f{}", bar.name, bar.position, bar.enabled, bar.autoHide,
+          "{}\x1F{}\x1F{}\x1F{}\x1F{}\x1F{}\x1F{}\x1F{}\x1F{}\x1F{}", bar.name, bar.position, bar.enabled, bar.autoHide,
           bar.reserveSpace, bar.layer, bar.thickness, bar.marginEnds, bar.marginEdge, bar.shadow
       );
 
       item.push_back('\x1e');
       for (const auto& override : bar.monitorOverrides) {
         item += override.match;
-        item.push_back('\x1f');
+        item.push_back('\x1F');
         appendOptionalStackPart(item, override.enabled);
         appendOptionalStackPart(item, override.autoHide);
         appendOptionalStackPart(item, override.reserveSpace);
@@ -512,7 +514,7 @@ bool Dock::onPointerEvent(const PointerEvent& event) {
       }
       const float current = m_hoveredInstance->hideOpacity;
       m_hoveredInstance->hideAnimId = m_hoveredInstance->animations.animate(
-          current, 1.0f, Style::animNormal, Easing::EaseOutCubic,
+          current, 1.0F, Style::animNormal, Easing::EaseOutCubic,
           [inst = m_hoveredInstance, this](float v) {
             inst->hideOpacity = v;
             const auto& cfg = m_config->config().dock;
@@ -736,12 +738,12 @@ void Dock::reevaluateSmartAutoHide() {
 
     bool needsRedraw = pinnedChanged;
     if (wantsPinned) {
-      if (instance->hideOpacity < 1.0f || pinnedChanged) {
+      if (instance->hideOpacity < 1.0F || pinnedChanged) {
         shell::dock::revealAutoHideDock(*instance, *m_config);
         needsRedraw = true;
       }
     } else if (!instance->pointerInside && m_popupOwnerInstance == nullptr) {
-      if (instance->hideOpacity > 0.0f || pinnedChanged) {
+      if (instance->hideOpacity > 0.0F || pinnedChanged) {
         shell::dock::startHideFadeOut(*instance, *m_config);
         needsRedraw = true;
       }
@@ -1076,7 +1078,7 @@ void Dock::closeItemMenu() {
 
   if (owner->pointerInside
       || m_config == nullptr
-      || owner->hideOpacity <= 0.0f
+      || owner->hideOpacity <= 0.0F
       || !dockPointerHideAllowed(m_config->config().dock, *owner)) {
     return;
   }
@@ -1136,7 +1138,7 @@ void Dock::activateOrLaunchItem(shell::dock::DockInstance& instance, const shell
         .deadline = std::chrono::steady_clock::now() + std::chrono::seconds(8),
     };
     m_platform->prepareAppLaunchOnOutput(instance.output);
-    (void)desktop_entry_launch::launchEntry(action.entry, dockLaunchOptions(*m_platform, *m_config));
+    (void)desktop_entry_launch::launchEntry(action.entry, dockLaunchOptions(*m_platform, *m_config, action.entry));
     return;
   }
 
@@ -1206,11 +1208,12 @@ void Dock::openItemMenu(shell::dock::DockInstance& instance, const shell::dock::
             }
           },
       .launchAction =
-          [this, entryId, entryWorkingDir, entryTerminal,
+          [this, entryId, entryWorkingDir, entryTerminal, entryForPin,
            output = instance.output](const DesktopAction& desktopAction) {
             m_platform->prepareAppLaunchOnOutput(output);
             (void)desktop_entry_launch::launchAction(
-                desktopAction, entryId, entryWorkingDir, entryTerminal, dockLaunchOptions(*m_platform, *m_config)
+                desktopAction, entryId, entryWorkingDir, entryTerminal,
+                dockLaunchOptions(*m_platform, *m_config, entryForPin)
             );
           },
       .setEntryPinned =

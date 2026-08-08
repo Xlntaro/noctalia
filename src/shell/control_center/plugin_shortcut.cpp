@@ -64,27 +64,89 @@ void PluginShortcut::start() {
     if (token == nullptr || !*token) {
       return;
     }
+    if (result.modulePathsKnown) {
+      m_scriptWatcher.setModulePaths(result.modulePaths);
+      recordLoadedModuleMtimes(result.modulePaths);
+    }
     handleResult(result);
   });
 
   m_runtime->start(m_sourcePath.string(), std::move(code), makeScriptSnapshot());
+  recordLoadedSourceMtime();
   armTimer();
   setupScriptWatch();
 }
 
 void PluginShortcut::setupScriptWatch() {
-  if (m_sourcePath.empty() || m_fileWatcher == nullptr) {
-    return;
-  }
-  m_watchId = m_fileWatcher->watch(m_sourcePath, [this] { reloadScript(); }, FileWatcher::WatchTrigger::WriteCompleted);
+  m_scriptWatcher.start(m_fileWatcher, m_sourcePath, [this] { reloadScript(); });
 }
 
-void PluginShortcut::teardownScriptWatch() {
-  if (m_watchId == 0 || m_fileWatcher == nullptr) {
+void PluginShortcut::teardownScriptWatch() { m_scriptWatcher.stop(); }
+
+void PluginShortcut::onPanelClose() {
+  m_updateTimer.stop();
+  teardownScriptWatch();
+}
+
+void PluginShortcut::onPanelOpen() {
+  if (m_runtime == nullptr) {
     return;
   }
-  m_fileWatcher->unwatch(m_watchId);
-  m_watchId = 0;
+  if (sourceChangedSinceLoad()) {
+    reloadScript(false);
+  } else {
+    armTimer();
+  }
+  setupScriptWatch();
+}
+
+void PluginShortcut::recordLoadedSourceMtime() {
+  std::error_code ec;
+  m_loadedSourceMtime = std::filesystem::last_write_time(m_sourcePath, ec);
+  if (ec) {
+    m_loadedSourceMtime = {};
+  }
+}
+
+void PluginShortcut::recordLoadedModuleMtimes(std::span<const std::filesystem::path> paths) {
+  m_loadedModuleMtimes.clear();
+  for (const auto& path : paths) {
+    std::error_code ec;
+    const auto mtime = std::filesystem::last_write_time(path, ec);
+    // Only a module the VM actually loaded gets here, so a stat failure means it
+    // was removed while the panel was closed — reload to surface that.
+    m_loadedModuleMtimes.insert_or_assign(path, ec ? std::filesystem::file_time_type{} : mtime);
+  }
+}
+
+bool PluginShortcut::sourceChangedSinceLoad() const {
+  if (m_sourcePath.empty() || m_loadedSourceMtime == std::filesystem::file_time_type{}) {
+    return false;
+  }
+  std::error_code ec;
+  const auto current = std::filesystem::last_write_time(m_sourcePath, ec);
+  if (ec) {
+    return false;
+  }
+  if (current != m_loadedSourceMtime) {
+    return true;
+  }
+  for (const auto& [path, loadedMtime] : m_loadedModuleMtimes) {
+    std::error_code moduleEc;
+    const auto moduleMtime = std::filesystem::last_write_time(path, moduleEc);
+    if (moduleEc) {
+      // Unreadable now but readable at load: a real change. Unreadable at load too:
+      // nothing new to react to, so don't reload on every panel open.
+      if (loadedMtime != std::filesystem::file_time_type{}) {
+        return true;
+      }
+      continue;
+    }
+    if (moduleMtime != loadedMtime) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void PluginShortcut::resetPresentation() {
@@ -96,27 +158,34 @@ void PluginShortcut::resetPresentation() {
   m_updateIntervalMs = 1000;
 }
 
-void PluginShortcut::reloadScript() {
+void PluginShortcut::reloadScript(bool notifyUser) {
   std::string code = readFile(m_sourcePath);
   auto name = m_sourcePath.filename().string();
   if (code.empty()) {
     kLog.warn("shortcut '{}': failed to reload '{}'", m_entryId, m_sourcePath.string());
-    notify::error("Noctalia", i18n::tr("bar.widgets.scripted.reload-failed"), name);
+    if (notifyUser) {
+      notify::error("Noctalia", i18n::tr("bar.widgets.scripted.reload-failed"), name);
+    }
     return;
   }
   if (m_runtime == nullptr) {
     kLog.warn("shortcut '{}': runtime unavailable for reload", m_entryId);
-    notify::error("Noctalia", i18n::tr("bar.widgets.scripted.reload-failed"), name);
+    if (notifyUser) {
+      notify::error("Noctalia", i18n::tr("bar.widgets.scripted.reload-failed"), name);
+    }
     return;
   }
 
   m_updateTimer.stop();
   resetPresentation();
   m_runtime->reload(m_sourcePath.string(), std::move(code), makeScriptSnapshot());
+  recordLoadedSourceMtime();
   armTimer();
   PanelManager::instance().refresh();
   kLog.info("hot reload: reloaded shortcut '{}'", m_entryId);
-  notify::info("Noctalia", i18n::tr("bar.widgets.scripted.reloaded"), name);
+  if (notifyUser) {
+    notify::info("Noctalia", i18n::tr("bar.widgets.scripted.reloaded"), name);
+  }
 }
 
 void PluginShortcut::handleResult(const scripting::ScriptResult& result) {

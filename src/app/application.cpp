@@ -116,22 +116,22 @@ namespace {
   }
 
   template <typename Fn> void runStartupPhase(std::string_view label, Fn&& fn) {
-    constexpr float kSlowStartupPhaseDebugMs = 50.0f;
-    constexpr float kSlowStartupPhaseWarnMs = 1000.0f;
+    constexpr float kSlowStartupPhaseDebugMs = 50.0F;
+    constexpr float kSlowStartupPhaseWarnMs = 1000.0F;
 
     const auto start = std::chrono::steady_clock::now();
     try {
       fn();
     } catch (...) {
-      kLog.warn("startup phase {} failed after {:.1f}ms", label, elapsedSince(start));
+      kLog.warn("startup phase {} failed after {:.1F}ms", label, elapsedSince(start));
       throw;
     }
 
     const float ms = elapsedSince(start);
     if (ms >= kSlowStartupPhaseWarnMs) {
-      kLog.warn("startup phase {} took {:.1f}ms", label, ms);
+      kLog.warn("startup phase {} took {:.1F}ms", label, ms);
     } else if (ms >= kSlowStartupPhaseDebugMs) {
-      kLog.debug("startup phase {} took {:.1f}ms", label, ms);
+      kLog.debug("startup phase {} took {:.1F}ms", label, ms);
     }
   }
 } // namespace
@@ -229,6 +229,7 @@ void Application::run(std::function<void()> startupReadyCallback) {
     m_pluginManager.setOnSourceUpdated([this](const std::string& sourceName) {
       m_settingsWindow.invalidatePluginSourceCache(sourceName);
     });
+    m_pluginManager.setOnEnabled([this](std::string_view pluginId) { m_pluginServiceHost.enablePlugin(pluginId); });
   });
   runStartupPhase("initIpc", [this]() { initIpc(); });
   runStartupPhase("buildPollSources", [this]() { (void)buildPollSources(); });

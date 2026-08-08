@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 class InputArea;
@@ -39,6 +40,9 @@ public:
   // Optional: respond to an activation gesture (click). The grid still
   // updates its own selection state and fires onSelectionChanged.
   virtual void onActivate(std::size_t /*index*/) {}
+
+  // Optional tooltip for the item under the pointer.
+  [[nodiscard]] virtual std::string itemTooltip(std::size_t /*index*/) const { return {}; }
 
   // Return true when an overlay consumed the press.
   virtual bool onPointerPress(
@@ -85,6 +89,9 @@ public:
   void scrollToIndex(std::size_t index);
   void setSelectedIndex(std::optional<std::size_t> index);
   [[nodiscard]] std::optional<std::size_t> selectedIndex() const noexcept { return m_selectedIndex; }
+  // Surface-local anchor point for item `index` (cell center). False when layout
+  // metrics are unavailable or the index is out of range.
+  [[nodiscard]] bool absoluteAnchorForIndex(std::size_t index, float& outX, float& outY) const noexcept;
   // Items to move for a Page Up/Down step (one viewport of rows, at least one item).
   [[nodiscard]] std::size_t pageItemStride() const noexcept;
   // Column count from the most recent layout pass (for keyboard navigation).
@@ -107,6 +114,8 @@ private:
   void onPointerMotion(float localX, float localY);
   void onPointerLeave();
   void onPointerPress(float localX, float localY);
+  void onPoolTooltipMotion(std::size_t slot, float localX, float localY);
+  void onPoolTooltipLeave(std::size_t slot);
   void onSecondaryPointerPress(float localX, float localY);
   [[nodiscard]] std::optional<std::size_t> indexAt(float localX, float localY) const noexcept;
   void cellLocalAt(float localX, float localY, std::size_t index, float& cellLocalX, float& cellLocalY) const noexcept;
@@ -118,17 +127,18 @@ private:
 
   VirtualGridAdapter* m_adapter = nullptr;
   std::vector<Node*> m_pool;
+  std::vector<InputArea*> m_poolTooltipAreas;
   std::vector<std::optional<std::size_t>> m_slotBoundIndex;
   std::vector<bool> m_slotBoundSelected;
   std::vector<bool> m_slotBoundHovered;
   std::vector<bool> m_slotBoundOverlayHovered;
 
   std::size_t m_columns = 0;
-  float m_minCellWidth = 96.0f;
-  float m_cellHeight = 96.0f;
+  float m_minCellWidth = 96.0F;
+  float m_cellHeight = 96.0F;
   bool m_squareCells = true;
-  float m_columnGap = 4.0f;
-  float m_rowGap = 4.0f;
+  float m_columnGap = 4.0F;
+  float m_rowGap = 4.0F;
   std::size_t m_overscanRows = 2;
 
   std::optional<std::size_t> m_selectedIndex;
@@ -139,10 +149,10 @@ private:
   // Most recent layout snapshot — used by hit-testing and scrollToIndex
   // without rerunning measurement.
   std::size_t m_layoutColumns = 1;
-  float m_cellWidth = 0.0f;
-  float m_cellHeightResolved = 0.0f;
-  float m_virtualWidth = 0.0f;
-  float m_virtualHeight = 0.0f;
+  float m_cellWidth = 0.0F;
+  float m_cellHeightResolved = 0.0F;
+  float m_virtualWidth = 0.0F;
+  float m_virtualHeight = 0.0F;
   std::size_t m_visibleStartIndex = 0;
   std::size_t m_itemCount = 0;
   bool m_pendingScrollToIndex = false;

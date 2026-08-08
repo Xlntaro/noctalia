@@ -1,7 +1,10 @@
 #include "config/config_types.h"
+#include "render/scene/input_area.h"
 #include "shell/bar/widget_action.h"
 #include "shell/bar/widget_action_dispatcher.h"
 #include "shell/bar/widget_gesture.h"
+#include "shell/settings/settings_control_factory.h"
+#include "ui/controls/input.h"
 
 #include <array>
 #include <cassert>
@@ -10,6 +13,17 @@
 #include <wayland-client-protocol.h>
 
 namespace {
+  Input* findInput(Node& node) {
+    if (auto* input = dynamic_cast<Input*>(&node)) {
+      return input;
+    }
+    for (const auto& child : node.children()) {
+      if (auto* input = findInput(*child)) {
+        return input;
+      }
+    }
+    return nullptr;
+  }
 
   using namespace noctalia::bar;
 
@@ -54,6 +68,21 @@ namespace {
     assert(gestureForScroll(WL_POINTER_AXIS_HORIZONTAL_SCROLL, 1.0f) == Gesture::ScrollRight);
     // No whole detent accumulated yet.
     assert(!gestureForScroll(WL_POINTER_AXIS_VERTICAL_SCROLL, 0.0f).has_value());
+  }
+
+  void testScrollRepeatModes() {
+    assert(parseScrollRepeatMode("auto") == ScrollRepeatMode::Auto);
+    assert(parseScrollRepeatMode("gesture") == ScrollRepeatMode::Gesture);
+    assert(parseScrollRepeatMode("steps") == ScrollRepeatMode::Steps);
+    assert(!parseScrollRepeatMode("cycle").has_value());
+    assert(!parseScrollRepeatMode("").has_value());
+
+    assert(scrollRepeatsEveryStep(ScrollRepeatMode::Auto, false));
+    assert(!scrollRepeatsEveryStep(ScrollRepeatMode::Auto, true));
+    assert(!scrollRepeatsEveryStep(ScrollRepeatMode::Gesture, false));
+    assert(!scrollRepeatsEveryStep(ScrollRepeatMode::Gesture, true));
+    assert(scrollRepeatsEveryStep(ScrollRepeatMode::Steps, false));
+    assert(scrollRepeatsEveryStep(ScrollRepeatMode::Steps, true));
   }
 
   void testActionGrammar() {
@@ -246,13 +275,82 @@ namespace {
     }
   }
 
+  void testInheritedActionArgumentsRemainEditable() {
+    Config config;
+    std::string editingWidgetName;
+    std::string editingCapsuleGroupId;
+    std::vector<std::string> selectedLaneWidgets;
+    std::string pendingDeleteWidgetName;
+    std::string pendingDeleteWidgetSettingPath;
+    std::string renamingWidgetName;
+    std::string pendingGestureKey;
+    std::string pendingGestureVerb;
+    std::string actionsExpandedFor;
+    std::string storedAction;
+    std::vector<std::string> storedPath;
+
+    settings::SettingsControlFactory factory(
+        settings::SettingsContentContext{
+            .config = config,
+            .editingWidgetName = editingWidgetName,
+            .editingCapsuleGroupId = editingCapsuleGroupId,
+            .selectedLaneWidgets = selectedLaneWidgets,
+            .pendingDeleteWidgetName = pendingDeleteWidgetName,
+            .pendingDeleteWidgetSettingPath = pendingDeleteWidgetSettingPath,
+            .renamingWidgetName = renamingWidgetName,
+            .pendingGestureKey = pendingGestureKey,
+            .pendingGestureVerb = pendingGestureVerb,
+            .actionsExpandedFor = actionsExpandedFor,
+            .actionCatalog = {settings::GestureActionOption{
+                .option = settings::SelectOption{.value = "volume-up", .label = "volume-up"},
+                .argsSpec = "[step]",
+            }},
+            .setOverride =
+                [&storedAction, &storedPath](std::vector<std::string> path, ConfigOverrideValue value) {
+                  storedPath = std::move(path);
+                  storedAction = std::get<std::string>(std::move(value));
+                },
+            .clearOverride = [](std::vector<std::string>) {},
+        }
+    );
+
+    auto inherited = factory.makeGestureActionRow(
+        settings::GestureActionSetting{
+            .gestureKey = "scroll_up",
+            .defaultAction = "volume-up",
+        },
+        "Scroll up", {"widget", "volume", "actions", "scroll_up"}
+    );
+    auto* inheritedStep = findInput(*inherited);
+    assert(inheritedStep != nullptr);
+    assert(inheritedStep->value().empty());
+    inheritedStep->setValue("12%");
+    inheritedStep->inputArea()->dispatchFocusLoss();
+    assert(storedAction == "volume-up 12%");
+    assert(storedPath == std::vector<std::string>({"widget", "volume", "actions", "scroll_up"}));
+
+    auto configured = factory.makeGestureActionRow(
+        settings::GestureActionSetting{
+            .gestureKey = "scroll_up",
+            .configured = "volume-up 12%",
+            .defaultAction = "volume-up",
+        },
+        "Scroll up", {"widget", "volume", "actions", "scroll_up"}
+    );
+    const auto* configuredStep = findInput(*configured);
+    assert(configuredStep != nullptr);
+    assert(configuredStep->value() == "12%");
+  }
+
 } // namespace
 
 int main() {
   testGestureKeys();
   testButtonAndScrollMapping();
+  testScrollRepeatModes();
   testActionGrammar();
   testPanelVerbs();
   testLayeredResolution();
+  testInheritedActionArgumentsRemainEditable();
   return 0;
 }

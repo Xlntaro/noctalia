@@ -12,7 +12,7 @@ class TrayWidget;
 
 class TrayDrawerPanel : public Panel {
 public:
-  TrayDrawerPanel(TrayService* tray, ConfigService* config, std::size_t drawerColumns = 3);
+  TrayDrawerPanel(TrayService* tray, ConfigService* config);
   ~TrayDrawerPanel() override;
 
   void create() override;
@@ -29,12 +29,12 @@ private:
   void doUpdate(Renderer& renderer) override;
   [[nodiscard]] std::size_t currentDrawerColumns() const;
   [[nodiscard]] std::optional<float> currentDrawerItemSize() const;
+  [[nodiscard]] float resolvedItemGap() const;
   [[nodiscard]] std::vector<std::string> currentHiddenItems() const;
   [[nodiscard]] std::vector<std::string> currentPinnedItems() const;
   [[nodiscard]] std::size_t visibleItemCount() const;
 
   TrayService* m_tray = nullptr;
   ConfigService* m_config = nullptr;
-  std::size_t m_drawerColumns = 3;
   std::unique_ptr<TrayWidget> m_drawerWidget;
 };

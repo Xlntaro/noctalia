@@ -45,6 +45,7 @@ namespace noctalia::bar {
     config::schema::WidgetSettingField schema;
     std::optional<settings::WidgetSettingPresentation> presentation;
     std::function<void(Options&, const WidgetConfig*, std::string_view)> resolve;
+    std::function<bool(const Options&, const Options&)> valuesEqual;
   };
 
   namespace detail {
@@ -62,6 +63,7 @@ namespace noctalia::bar {
         || std::is_floating_point_v<T>
         || std::is_same_v<T, std::string>
         || std::is_same_v<T, std::vector<std::string>>
+        || std::is_same_v<T, WidgetSettingStringMap>
         || std::is_same_v<T, ColorSpec>;
 
     template <typename T>
@@ -77,6 +79,8 @@ namespace noctalia::bar {
         return config::schema::WidgetSettingType::Double;
       } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
         return config::schema::WidgetSettingType::StringList;
+      } else if constexpr (std::is_same_v<T, WidgetSettingStringMap>) {
+        return config::schema::WidgetSettingType::StringMap;
       } else if constexpr (std::is_same_v<T, ColorSpec>) {
         return config::schema::WidgetSettingType::Color;
       } else {
@@ -104,6 +108,8 @@ namespace noctalia::bar {
         return settings::WidgetControlKind::Double;
       } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
         return settings::WidgetControlKind::StringList;
+      } else if constexpr (std::is_same_v<T, WidgetSettingStringMap>) {
+        return settings::WidgetControlKind::StringMap;
       } else if constexpr (std::is_same_v<T, ColorSpec>) {
         return settings::WidgetControlKind::ColorSpec;
       } else {
@@ -450,7 +456,7 @@ namespace noctalia::bar {
       }
     }
 
-    return WidgetDefinitionField<Options>{
+    WidgetDefinitionField<Options> definitionField{
         .schema = std::move(schema),
         .presentation = std::move(spec.presentation),
         .resolve = [key, defaultValue, choices = std::move(spec.choices),
@@ -467,12 +473,39 @@ namespace noctalia::bar {
           options.*Member = std::move(value);
         },
     };
+    definitionField.valuesEqual = [](const Options& left, const Options& right) {
+      return left.*Member == right.*Member;
+    };
+    return definitionField;
   }
 
+  // Retunes one of the registry-owned common widget settings for a single widget
+  // type. A definition may adjust a common setting's default and presentation; it
+  // can neither add nor remove common settings. The registry rejects a key that
+  // does not name exactly one common setting. `defaultValue`, `descriptionKey`,
+  // and `replaceVisibleWhen` replace; `visibleWhen` refines and must declare `all`
+  // conditions only, which are appended to the common setting's own conditions.
+  struct WidgetCommonSettingOverride {
+    std::string_view key;
+    std::optional<WidgetSettingValue> defaultValue;
+    std::string_view descriptionKey;
+    std::optional<settings::WidgetSettingVisibility> visibleWhen;
+    std::optional<settings::WidgetSettingVisibility> replaceVisibleWhen;
+  };
+
   template <typename Options, typename Context = std::monostate> struct WidgetDefinition {
+    using ContextType = Context;
+
     std::string_view type;
     std::vector<WidgetDefinitionField<Options>> fields;
     std::function<void(Options&, const Context&)> finalize;
+    // Optional picker-glyph hook. It receives options resolved with a default context;
+    // an empty result uses the widget type's static glyph.
+    std::function<std::string(const Options&)> glyph;
+    // Optional cross-field semantic check on resolved options. A returned string
+    // describes the invalid combination; nullopt means the options are valid.
+    std::function<std::optional<std::string>(const Options&)> validateOptions;
+    std::vector<WidgetCommonSettingOverride> commonOverrides;
 
     [[nodiscard]] Options resolve(const WidgetConfig* config, std::string_view settingContext) const
       requires std::is_same_v<Context, std::monostate>
@@ -494,6 +527,13 @@ namespace noctalia::bar {
         finalize(options, context);
       }
       return options;
+    }
+
+    [[nodiscard]] bool fieldValuesEqual(const Options& left, const Options& right) const {
+      validate();
+      return std::ranges::all_of(fields, [&](const WidgetDefinitionField<Options>& field) {
+        return field.valuesEqual(left, right);
+      });
     }
 
     [[nodiscard]] config::schema::WidgetSettingSchema schemaFields() const {
@@ -528,10 +568,27 @@ namespace noctalia::bar {
         throw std::logic_error("widget definition type cannot be empty");
       }
       for (std::size_t i = 0; i < fields.size(); ++i) {
+        if (!fields[i].resolve || !fields[i].valuesEqual) {
+          throw std::logic_error(
+              std::format("widget definition '{}' field '{}' was not built by field<>()", type, fields[i].schema.key)
+          );
+        }
         for (std::size_t j = i + 1; j < fields.size(); ++j) {
           if (fields[i].schema.key == fields[j].schema.key) {
             throw std::logic_error(
                 std::format("widget definition '{}' has duplicate field '{}'", type, fields[i].schema.key)
+            );
+          }
+        }
+      }
+      for (std::size_t i = 0; i < commonOverrides.size(); ++i) {
+        if (commonOverrides[i].key.empty()) {
+          throw std::logic_error(std::format("widget definition '{}' has a common override without a key", type));
+        }
+        for (std::size_t j = i + 1; j < commonOverrides.size(); ++j) {
+          if (commonOverrides[i].key == commonOverrides[j].key) {
+            throw std::logic_error(
+                std::format("widget definition '{}' has duplicate common override '{}'", type, commonOverrides[i].key)
             );
           }
         }
