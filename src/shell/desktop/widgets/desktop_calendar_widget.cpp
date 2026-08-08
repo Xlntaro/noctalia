@@ -2,33 +2,23 @@
 
 #include "calendar/calendar_service.h"
 #include "config/config_service.h"
-#include "core/ui_phase.h"
 #include "i18n/i18n.h"
-#include "render/core/color.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
-#include "render/scene/node.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
+#include "ui/controls/calendar_view.h"
 #include "ui/controls/flex.h"
-#include "ui/controls/grid_tile.h"
-#include "ui/controls/grid_view.h"
 #include "ui/controls/label.h"
 #include "ui/controls/scroll_view.h"
 #include "ui/style.h"
 
 #include <algorithm>
-#include <array>
-#include <chrono>
-#include <cmath>
-#include <cstddef>
-#include <ctime>
-#include <format>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
-#include <vector>
 #include <wayland-client-protocol.h>
 
 namespace {
@@ -44,94 +34,8 @@ namespace {
   constexpr float kDayButtonSize = 34.0f;
   constexpr float kDotDiameter = 4.0f;
   constexpr float kWeekColumnWidth = 24.0f;
-
-  struct CalendarState {
-    int currentYear = 0;
-    int currentMonth = 0;
-    int today = 0;
-    int displayYear = 0;
-    int displayMonth = 0;
-    int displayWeekday = 0;
-    bool isCurrentMonth = false;
-  };
-
-  CalendarState calendarState(int monthOffset) {
-    const std::time_t now = std::time(nullptr);
-    std::tm local{};
-    localtime_r(&now, &local);
-
-    CalendarState state;
-    state.currentYear = local.tm_year + 1900;
-    state.currentMonth = local.tm_mon;
-    state.today = local.tm_mday;
-
-    const auto currentMonth =
-        std::chrono::year{state.currentYear} / std::chrono::month{static_cast<unsigned>(state.currentMonth + 1)};
-    const auto displayDate =
-        std::chrono::year_month_day((currentMonth + std::chrono::months{monthOffset}) / std::chrono::day{1});
-    state.displayYear = static_cast<int>(static_cast<std::int32_t>(displayDate.year()));
-    state.displayMonth = static_cast<int>(static_cast<unsigned>(displayDate.month())) - 1;
-    state.displayWeekday = static_cast<int>(std::chrono::weekday(std::chrono::sys_days{displayDate}).c_encoding());
-    state.isCurrentMonth = state.displayYear == state.currentYear && state.displayMonth == state.currentMonth;
-    return state;
-  }
-
-  int daysInMonth(int year, int month0) {
-    const auto last =
-        std::chrono::year{year} / std::chrono::month{static_cast<unsigned>(month0 + 1)} / std::chrono::last;
-    return static_cast<int>(static_cast<unsigned>(last.day()));
-  }
-
-  std::string monthName(int month0) {
-    if (month0 < 0 || month0 > 11) {
-      return {};
-    }
-    std::tm tm{};
-    tm.tm_mon = month0;
-    tm.tm_mday = 1;
-    return formatStrftime("%B", tm);
-  }
-
-  int dateKey(int year, int month0, int day) { return year * 10000 + (month0 + 1) * 100 + day; }
-
-  int localDateKey(std::chrono::system_clock::time_point time) {
-    const std::time_t raw = std::chrono::system_clock::to_time_t(time);
-    std::tm tm{};
-    localtime_r(&raw, &tm);
-    return dateKey(tm.tm_year + 1900, tm.tm_mon, tm.tm_mday);
-  }
-
-  std::pair<int, int> eventDayRange(const CalendarEvent& event) {
-    const int start = localDateKey(event.start);
-    auto endTime = event.end;
-    if (event.allDay && event.end > event.start) {
-      endTime -= std::chrono::hours{24};
-    }
-    return {start, std::max(start, localDateKey(endTime))};
-  }
-
-  ColorSpec eventColor(const CalendarEvent& event) {
-    Color color;
-    if (!event.colorHex.empty() && tryParseHexColor(event.colorHex, color)) {
-      return fixedColorSpec(color);
-    }
-    if (const auto role = colorRoleFromToken(event.colorHex); role.has_value()) {
-      return colorSpecFromRole(*role);
-    }
-    return colorSpecFromRole(ColorRole::Primary);
-  }
-
-  void applyFontFamily(Node* node, const std::string& family) {
-    if (node == nullptr) {
-      return;
-    }
-    if (auto* label = dynamic_cast<Label*>(node); label != nullptr) {
-      label->setFontFamily(family);
-    }
-    for (const auto& child : node->children()) {
-      applyFontFamily(child.get(), family);
-    }
-  }
+  constexpr std::string_view kEventDateFormat = "%A %e %B";
+  constexpr std::string_view kEventTimeFormat = "%H:%M";
 
 } // namespace
 
@@ -350,14 +254,13 @@ void DesktopCalendarWidget::doLayout(Renderer& renderer) {
   if (m_showEvents) {
     rebuildEventList();
   }
-  applyFontFamily(root(), m_fontFamily);
   m_rootLayout->layout(renderer);
   m_dirty = false;
 }
 
 void DesktopCalendarWidget::doUpdate(Renderer& /*renderer*/) {
-  const CalendarState state = calendarState(m_monthOffset);
-  const int todayKey = dateKey(state.currentYear, state.currentMonth, state.today);
+  const calendar_view::State state = calendar_view::stateForOffset(m_monthOffset);
+  const int todayKey = calendar_view::dateKey(state.current);
   if (todayKey != m_lastTodayKey) {
     m_lastTodayKey = todayKey;
     m_dirty = true;
@@ -373,7 +276,11 @@ void DesktopCalendarWidget::doUpdate(Renderer& /*renderer*/) {
 }
 
 void DesktopCalendarWidget::onFontFamilyChanged(const std::string& family, Renderer& /*renderer*/) {
-  applyFontFamily(root(), family);
+  for (Label* label : {m_todayLabel, m_monthLabel, m_eventsTitle}) {
+    if (label != nullptr) {
+      label->setFontFamily(family);
+    }
+  }
 }
 
 void DesktopCalendarWidget::changeMonthBy(int delta) {
@@ -386,12 +293,12 @@ void DesktopCalendarWidget::changeMonthBy(int delta) {
 }
 
 void DesktopCalendarWidget::focusToday() {
-  const CalendarState state = calendarState(0);
+  const calendar_view::State state = calendar_view::stateForOffset(0);
   m_monthOffset = 0;
-  m_selectedYear = state.currentYear;
-  m_selectedMonth = state.currentMonth;
-  m_selectedDay = state.today;
-  m_lastTodayKey = dateKey(state.currentYear, state.currentMonth, state.today);
+  m_selectedYear = state.current.year;
+  m_selectedMonth = state.current.month;
+  m_selectedDay = state.current.day;
+  m_lastTodayKey = calendar_view::dateKey(state.current);
   m_dirty = true;
   requestLayout();
 }
@@ -402,14 +309,9 @@ void DesktopCalendarWidget::markDirty() {
 }
 
 void DesktopCalendarWidget::rebuildCalendar() {
-  uiAssertNotRendering("DesktopCalendarWidget::rebuildCalendar");
   if (m_grid == nullptr || m_monthLabel == nullptr) {
     return;
   }
-  while (!m_grid->children().empty()) {
-    m_grid->removeChild(m_grid->children().front().get());
-  }
-
   const float scale = contentScale();
   const float gap = kGridGap * scale;
   const float calendarWidth = (kCalendarWidth + (m_showWeekNumbers ? kWeekColumnWidth + kGridGap : 0.0f)) * scale;
@@ -417,329 +319,52 @@ void DesktopCalendarWidget::rebuildCalendar() {
   const float dayGridWidth = calendarWidth - (m_showWeekNumbers ? weekWidth + gap : 0.0f);
   const float dayColumnWidth = std::max(1.0f, (dayGridWidth - 6.0f * gap) / 7.0f);
   const float buttonSize = std::min(kDayButtonSize * scale, dayColumnWidth);
-  const float cellHeight = kDayCellHeight * scale;
-  const float weekdayHeight = kWeekdayHeight * scale;
-  const float dotDiameter = kDotDiameter * scale;
 
-  const CalendarState state = calendarState(m_monthOffset);
-  const int year = state.displayYear;
-  const int month = state.displayMonth;
-  m_monthLabel->setText(monthName(month) + " " + std::to_string(year));
-  const bool focusedOnToday = m_monthOffset == 0
-      && m_selectedYear == state.currentYear
-      && m_selectedMonth == state.currentMonth
-      && m_selectedDay == state.today;
-  if (focusedOnToday) {
-    m_monthLabel->clearTooltip();
-  } else {
-    m_monthLabel->setTooltip(i18n::tr("control-center.calendar.today"));
-  }
-
-  const int firstDayOfWeek = localeFirstDayOfWeek();
-  std::array<std::string, 7> weekdays;
-  for (int i = 0; i < 7; ++i) {
-    std::tm tm{};
-    tm.tm_wday = (firstDayOfWeek + i) % 7;
-    tm.tm_mday = 1;
-    weekdays[static_cast<std::size_t>(i)] = formatStrftime("%a", tm);
-  }
-
-  auto weekdayRow = std::make_unique<GridView>();
-  weekdayRow->setColumns(7);
-  weekdayRow->setColumnGap(gap);
-  weekdayRow->setStretchItems(true);
-  weekdayRow->setSize(dayGridWidth, weekdayHeight);
-  weekdayRow->setMinCellHeight(weekdayHeight);
-  for (std::size_t i = 0; i < weekdays.size(); ++i) {
-    auto tile = std::make_unique<GridTile>();
-    tile->setDirection(FlexDirection::Vertical);
-    tile->setAlign(FlexAlign::Center);
-    tile->setJustify(FlexJustify::Center);
-    const int weekday = (firstDayOfWeek + static_cast<int>(i)) % 7;
-    tile->addChild(
-        ui::label({
-            .text = weekdays[i],
-            .fontSize = Style::fontSizeCaption * scale,
-            .fontWeight = FontWeight::Medium,
-            .fontFamily = m_fontFamily,
-            .color =
-                colorSpecFromRole(weekday == 0 || weekday == 6 ? ColorRole::Secondary : ColorRole::OnSurfaceVariant),
-            .maxLines = 1,
-        })
-    );
-    weekdayRow->addChild(std::move(tile));
-  }
-
-  const int firstWeekdayOffset = (state.displayWeekday - firstDayOfWeek + 7) % 7;
-  const int previousMonth = month == 0 ? 11 : month - 1;
-  const int previousYear = month == 0 ? year - 1 : year;
-  const int previousDays = daysInMonth(previousYear, previousMonth);
-  const int monthDays = daysInMonth(year, month);
-  const int nextMonth = month == 11 ? 0 : month + 1;
-  const int nextYear = month == 11 ? year + 1 : year;
-
-  std::array<std::vector<ColorSpec>, 32> eventDots;
-  if (m_calendar != nullptr) {
-    const int firstKey = dateKey(year, month, 1);
-    const int lastKey = dateKey(year, month, monthDays);
-    for (const CalendarEvent& event : m_calendar->snapshot().events) {
-      const auto [eventStart, eventEnd] = eventDayRange(event);
-      if (eventEnd < firstKey || eventStart > lastKey) {
-        continue;
-      }
-      for (int day = 1; day <= monthDays; ++day) {
-        const int key = dateKey(year, month, day);
-        auto& dots = eventDots[static_cast<std::size_t>(day)];
-        if (key >= eventStart && key <= eventEnd && dots.size() < 3) {
-          dots.push_back(eventColor(event));
-        }
-      }
-    }
-  }
-
-  auto dayGrid = std::make_unique<GridView>();
-  dayGrid->setColumns(7);
-  dayGrid->setColumnGap(gap);
-  dayGrid->setStretchItems(true);
-  dayGrid->setSize(dayGridWidth, 6.0f * cellHeight + 5.0f * gap);
-  dayGrid->setMinCellHeight(cellHeight);
-
-  int inMonthDay = 1;
-  int trailingDay = 1;
-  for (int index = 0; index < 42; ++index) {
-    int cellYear = year;
-    int cellMonth = month;
-    int cellDay = 0;
-    int monthShift = 0;
-    bool inMonth = false;
-
-    if (index < firstWeekdayOffset) {
-      cellDay = previousDays - firstWeekdayOffset + index + 1;
-      cellYear = previousYear;
-      cellMonth = previousMonth;
-      monthShift = -1;
-    } else if (inMonthDay > monthDays) {
-      cellDay = trailingDay++;
-      cellYear = nextYear;
-      cellMonth = nextMonth;
-      monthShift = 1;
-    } else {
-      cellDay = inMonthDay++;
-      inMonth = true;
-    }
-
-    auto tile = std::make_unique<GridTile>();
-    tile->setDirection(FlexDirection::Vertical);
-    tile->setAlign(FlexAlign::Center);
-    tile->setJustify(FlexJustify::Center);
-    tile->setGap(1.0f * scale);
-
-    auto button = ui::button({
-        .text = std::to_string(cellDay),
-        .fontSize = Style::fontSizeBody * scale,
-        .contentAlign = ButtonContentAlign::Center,
-        .variant = ButtonVariant::Ghost,
-        .minWidth = buttonSize,
-        .minHeight = buttonSize,
-        .padding = 0.0f,
-        .radius = Style::scaledRadiusMd(scale),
-        .width = buttonSize,
-        .height = buttonSize,
-    });
-    if (button->label() != nullptr) {
-      button->label()->setFontFamily(m_fontFamily);
-    }
-
-    if (!inMonth) {
-      Button::ButtonPalette muted = Button::defaultPalette(ButtonVariant::Ghost);
-      muted.normal.label = colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.75f);
-      button->setCustomPalette(muted);
-    } else {
-      const bool selected = m_selectedYear == year && m_selectedMonth == month && m_selectedDay == cellDay;
-      if (selected) {
-        button->setVariant(ButtonVariant::Primary);
-      } else {
-        if (state.isCurrentMonth && cellDay == state.today) {
-          Button::ButtonPalette today = Button::defaultPalette(ButtonVariant::Ghost);
-          today.normal.label = colorSpecFromRole(ColorRole::Primary);
-          button->setCustomPalette(today);
-        }
-        if (button->label() != nullptr) {
-          button->label()->setFontWeight(FontWeight::Bold);
-        }
-      }
-    }
-
-    auto selectDay = [this, cellYear, cellMonth, cellDay, monthShift]() {
-      m_selectedYear = cellYear;
-      m_selectedMonth = cellMonth;
-      m_selectedDay = cellDay;
-      m_monthOffset += monthShift;
-      m_dirty = true;
-      requestLayout();
-    };
-    button->setOnClick(selectDay);
-    tile->addChild(std::move(button));
-
-    auto dots = ui::row({.align = FlexAlign::Center, .justify = FlexJustify::Center, .gap = 2.0f * scale});
-    dots->setSize(buttonSize, dotDiameter);
-    if (inMonth) {
-      for (const ColorSpec& color : eventDots[static_cast<std::size_t>(cellDay)]) {
-        dots->addChild(
-            ui::box({
-                .fill = color,
-                .radius = dotDiameter * 0.5f,
-                .width = dotDiameter,
-                .height = dotDiameter,
-            })
-        );
-      }
-    }
-    auto dotArea = std::make_unique<InputArea>();
-    dotArea->setSize(buttonSize, dotDiameter);
-    dotArea->setOnClick([selectDay](const InputArea::PointerData&) { selectDay(); });
-    dotArea->addChild(std::move(dots));
-    tile->addChild(std::move(dotArea));
-    dayGrid->addChild(std::move(tile));
-  }
-
-  const float gridHeight = weekdayHeight + gap + 6.0f * cellHeight + 5.0f * gap;
-  auto days = ui::column({.gap = gap});
-  days->setSize(dayGridWidth, gridHeight);
-  days->addChild(std::move(weekdayRow));
-  days->addChild(std::move(dayGrid));
-
-  if (m_showWeekNumbers) {
-    auto weekColumn = ui::column({.align = FlexAlign::Center, .gap = gap});
-    auto weekdaySpacer = ui::column({});
-    weekdaySpacer->setSize(weekWidth, weekdayHeight);
-    weekColumn->addChild(std::move(weekdaySpacer));
-
-    const int thursdayColumn = (4 - firstDayOfWeek + 7) % 7;
-    const auto firstThursday =
-        std::chrono::sys_days(std::chrono::year{year} / std::chrono::month{static_cast<unsigned>(month + 1)} / 1)
-        - std::chrono::days{firstWeekdayOffset}
-        + std::chrono::days{thursdayColumn};
-    for (int row = 0; row < 6; ++row) {
-      auto cell = ui::column({.align = FlexAlign::Center, .justify = FlexJustify::Center});
-      cell->setSize(weekWidth, cellHeight);
-      cell->addChild(
-          ui::label({
-              .text = std::format("{:%V}", firstThursday + std::chrono::days{row * 7}),
-              .fontSize = Style::fontSizeCaption * scale,
-              .fontFamily = m_fontFamily,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.7f),
-              .maxLines = 1,
-          })
-      );
-      weekColumn->addChild(std::move(cell));
-    }
-    weekColumn->setSize(weekWidth, gridHeight);
-
-    auto row = ui::row({.gap = gap});
-    row->setSize(calendarWidth, gridHeight);
-    row->addChild(std::move(weekColumn));
-    row->addChild(std::move(days));
-    m_grid->addChild(std::move(row));
-  } else {
-    m_grid->addChild(std::move(days));
-  }
-  m_grid->setSize(calendarWidth, gridHeight);
+  calendar_view::rebuildMonth({
+      .grid = *m_grid,
+      .monthLabel = *m_monthLabel,
+      .snapshot = m_calendar != nullptr ? &m_calendar->snapshot() : nullptr,
+      .selected = {.year = m_selectedYear, .month = m_selectedMonth, .day = m_selectedDay},
+      .monthOffset = m_monthOffset,
+      .showWeekNumbers = m_showWeekNumbers,
+      .scale = scale,
+      .layout =
+          {
+              .width = calendarWidth,
+              .weekdayHeight = kWeekdayHeight * scale,
+              .dayCellHeight = kDayCellHeight * scale,
+              .dayButtonSize = buttonSize,
+              .gap = gap,
+              .dotDiameter = kDotDiameter * scale,
+              .dotGap = 2.0f * scale,
+              .weekColumnWidth = weekWidth,
+              .weekDaysGap = m_showWeekNumbers ? gap : 0.0f,
+          },
+      .fontFamily = m_fontFamily,
+      .onDateSelected = [this](calendar_view::Date date, int monthShift) {
+        m_selectedYear = date.year;
+        m_selectedMonth = date.month;
+        m_selectedDay = date.day;
+        m_monthOffset += monthShift;
+        m_dirty = true;
+        requestLayout();
+      },
+  });
 }
 
 void DesktopCalendarWidget::rebuildEventList() {
-  if (m_eventsScroll == nullptr || m_eventsScroll->content() == nullptr) {
+  if (m_eventsScroll == nullptr) {
     return;
   }
-  const float scale = contentScale();
-  Flex* content = m_eventsScroll->content();
-  content->setDirection(FlexDirection::Vertical);
-  content->setAlign(FlexAlign::Stretch);
-  content->setGap(Style::spaceSm * scale);
-  while (!content->children().empty()) {
-    content->removeChild(content->children().front().get());
-  }
-
-  std::tm selected{};
-  selected.tm_year = m_selectedYear - 1900;
-  selected.tm_mon = m_selectedMonth;
-  selected.tm_mday = m_selectedDay;
-  selected.tm_isdst = -1;
-  const std::time_t selectedRaw = std::mktime(&selected);
-  if (m_eventsTitle != nullptr) {
-    const char* format =
-        m_config != nullptr ? m_config->config().controlCenter.calendarTab.eventDateFormat.c_str() : "%A %e %B";
-    m_eventsTitle->setText(formatLocalUnixTime(static_cast<std::int64_t>(selectedRaw), format));
-  }
-
-  std::vector<const CalendarEvent*> events;
-  const int selectedKey = dateKey(m_selectedYear, m_selectedMonth, m_selectedDay);
-  if (m_calendar != nullptr) {
-    for (const CalendarEvent& event : m_calendar->snapshot().events) {
-      const auto [start, end] = eventDayRange(event);
-      if (selectedKey >= start && selectedKey <= end) {
-        events.push_back(&event);
-      }
-    }
-  }
-
-  if (events.empty()) {
-    content->addChild(
-        ui::label({
-            .text = i18n::tr("control-center.calendar.no-events"),
-            .fontSize = Style::fontSizeBody * scale,
-            .fontFamily = m_fontFamily,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-            .maxLines = 1,
-        })
-    );
-    return;
-  }
-
-  const float dotWidth = Style::spaceXs * scale;
-  const float rowGap = Style::spaceSm * scale;
-  const float textWidth = std::max(40.0f, (kEventsWidth - Style::spaceXs * 2.0f) * scale - dotWidth - rowGap);
-  for (const CalendarEvent* event : events) {
-    std::string timeText;
-    if (event->allDay) {
-      timeText = i18n::tr("control-center.calendar.all-day");
-    } else {
-      const std::time_t raw = std::chrono::system_clock::to_time_t(event->start);
-      const char* format =
-          m_config != nullptr ? m_config->config().controlCenter.calendarTab.eventTimeFormat.c_str() : "%H:%M";
-      timeText = formatLocalUnixTime(static_cast<std::int64_t>(raw), format);
-    }
-
-    auto details = ui::column(
-        {.align = FlexAlign::Start, .gap = Style::spaceXs * 0.5f * scale, .flexGrow = 1.0f},
-        ui::label({
-            .text = event->title.empty() ? i18n::tr("control-center.calendar.events") : event->title,
-            .fontSize = Style::fontSizeBody * scale,
-            .fontFamily = m_fontFamily,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .maxWidth = textWidth,
-            .maxLines = 3,
-        }),
-        ui::label({
-            .text = timeText,
-            .fontSize = Style::fontSizeCaption * scale,
-            .fontFamily = m_fontFamily,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-            .maxWidth = textWidth,
-            .maxLines = 1,
-        })
-    );
-    content->addChild(
-        ui::row(
-            {.align = FlexAlign::Stretch, .gap = rowGap},
-            ui::box({
-                .fill = eventColor(*event),
-                .radius = dotWidth * 0.5f,
-                .width = dotWidth,
-                .flexGrow = 0.0f,
-            }),
-            std::move(details)
-        )
-    );
-  }
+  calendar_view::rebuildEventList({
+      .scroll = *m_eventsScroll,
+      .reserveScrollbarGutter = true,
+      .title = m_eventsTitle,
+      .snapshot = m_calendar != nullptr ? &m_calendar->snapshot() : nullptr,
+      .selected = {.year = m_selectedYear, .month = m_selectedMonth, .day = m_selectedDay},
+      .scale = contentScale(),
+      .dateFormat = kEventDateFormat,
+      .timeFormat = kEventTimeFormat,
+      .fontFamily = m_fontFamily,
+  });
 }

@@ -799,6 +799,7 @@ _noctalia_sources = files(
   'src/ui/visuals/fancy_audio_visualizer.cpp',
   'src/ui/controls/box.cpp',
   'src/ui/controls/button.cpp',
+  'src/ui/controls/calendar_view.cpp',
   'src/ui/controls/drag_source.cpp',
   'src/ui/controls/drop_zone.cpp',
   'src/ui/controls/checkbox.cpp',
