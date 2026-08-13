@@ -213,7 +213,7 @@ std::unique_ptr<DesktopWidget> DesktopWidgetFactory::create(
         .color = getColorSpecSetting(settings, "color", colorSpecFromRole(ColorRole::OnSurface)),
         .shadow = getBoolSetting(settings, "shadow", true),
         .showCircle = getBoolSetting(settings, "circle", true),
-        .centerText = getBoolSetting(settings, "center_text", false),
+        .centerText = getBoolSetting(settings, "center_text", true),
         .timezone = getStringSetting(settings, "timezone", ""),
     });
     applyCommonSettings(*widget, settings);
@@ -231,6 +231,7 @@ std::unique_ptr<DesktopWidget> DesktopWidgetFactory::create(
         DesktopAudioVisualizerWidget::Options{
             .bands = getIntSetting(settings, "bands", 32),
             .mirrored = getBoolSetting(settings, "mirrored", true),
+            .reversed = getBoolSetting(settings, "reversed", false),
             .centered = getBoolSetting(settings, "centered", true),
             .showWhenIdle = getBoolSetting(settings, "show_when_idle", true),
             .color1 = getColorSpecSetting(settings, "color_1", colorSpecFromRole(ColorRole::Primary)),
@@ -355,6 +356,8 @@ std::unique_ptr<DesktopWidget> DesktopWidgetFactory::create(
     auto parseStat = [](const std::string& s) -> DesktopSysmonStat {
       if (s == "cpu_temp")
         return DesktopSysmonStat::CpuTemp;
+      if (s == "cpu_freq")
+        return DesktopSysmonStat::CpuFreq;
       if (s == "gpu_temp")
         return DesktopSysmonStat::GpuTemp;
       if (s == "gpu_usage")
@@ -462,6 +465,7 @@ std::unique_ptr<DesktopWidget> DesktopWidgetFactory::create(
         scripting::PluginRuntimeContext{
             .entryId = pluginEntry->fullId(),
             .sourcePath = pluginEntry->sourcePath,
+            .pluginDir = pluginEntry->pluginDir,
             .settings = std::move(seeded),
             .scriptApi = *m_scriptDeps.scriptApi,
             .fileWatcher = m_scriptDeps.fileWatcher,
